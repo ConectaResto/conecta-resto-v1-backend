@@ -17,64 +17,74 @@ enum UserRole {
 }
 
 model Restaurant {
-  id            Int        @id @default(autoincrement())
-  name          String     @db.VarChar(150)
-  address       String     @db.VarChar(255)
-  phone         String     @db.VarChar(30)
-  email         String?    @db.VarChar(150)
-  isActive      Boolean    @default(true) @map("is_active")
-  createdAt     DateTime   @default(now()) @map("created_at")
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(150)
+  address   String   @db.VarChar(255)
+  phone     String   @db.VarChar(30)
+  email     String?  @db.VarChar(150)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
 
-  products      Product[]
-  categories    Category[]
-  users         User[]
+  products   Product[]
+  categories Category[]
+  users      User[]
 
   @@map("restaurants")
 }
 
 model Category {
-  id            Int        @id @default(autoincrement())
-  name          String     @db.VarChar(100)
-  description   String?    @db.Text
-  restaurantId  Int        @map("restaurant_id")
-  createdAt     DateTime   @default(now()) @map("created_at")
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(100)
+  description  String?  @db.Text
+  restaurantId Int      @map("restaurant_id")
+  createdAt    DateTime @default(now()) @map("created_at")
 
-  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
-  products      Product[]
+  restaurant        Restaurant        @relation(fields: [restaurantId], references: [id])
+  productCategories ProductCategory[]
 
   @@unique([name, restaurantId])
   @@map("categories")
 }
 
 model Product {
-  id            Int        @id @default(autoincrement())
-  name          String     @db.VarChar(150)
-  description   String?    @db.Text
-  price         Decimal    @db.Decimal(10, 2)
-  image         String?    @db.VarChar(500)
-  restaurantId  Int        @map("restaurant_id")
-  categoryId    Int        @map("category_id")
-  createdAt     DateTime   @default(now()) @map("created_at")
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(150)
+  description  String?  @db.Text
+  price        Decimal  @db.Decimal(10, 2)
+  image        String?  @db.VarChar(500)
+  restaurantId Int      @map("restaurant_id")
+  createdAt    DateTime @default(now()) @map("created_at")
 
-  restaurant    Restaurant @relation(fields: [restaurantId], references: [id])
-  category      Category   @relation(fields: [categoryId], references: [id])
+  restaurant        Restaurant        @relation(fields: [restaurantId], references: [id])
+  productCategories ProductCategory[]
 
   @@index([restaurantId])
-  @@index([categoryId])
   @@map("products")
 }
 
-model User {
-  id             Int         @id @default(autoincrement())
-  name           String      @db.VarChar(150)
-  email          String      @unique @db.VarChar(191)
-  passwordHash   String      @db.VarChar(255) @map("password_hash")
-  role           UserRole
-  restaurantId   Int?        @map("restaurant_id")
-  isActive       Boolean     @default(true) @map("is_active")
-  createdAt      DateTime    @default(now()) @map("created_at")
+model ProductCategory {
+  productId  Int @map("product_id")
+  categoryId Int @map("category_id")
 
-  restaurant     Restaurant? @relation(fields: [restaurantId], references: [id])
+  product  Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([productId, categoryId])
+  @@index([categoryId])
+  @@map("products_categories")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String   @db.VarChar(150)
+  email        String   @unique @db.VarChar(191)
+  passwordHash String   @map("password_hash") @db.VarChar(255)
+  role         UserRole
+  restaurantId Int?     @map("restaurant_id")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant? @relation(fields: [restaurantId], references: [id])
 
   @@index([restaurantId])
   @@map("users")
