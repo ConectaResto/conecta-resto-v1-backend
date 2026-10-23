@@ -1,11 +1,21 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+} from '@nestjs/common';
 import { RestaurantsService } from './restaurants.service.js';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto.js';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto.js';
 
 @Controller('restaurants')
 export class RestaurantsController {
-  constructor(private readonly restaurantsService: RestaurantsService) { }
+  constructor(
+    private readonly restaurantsService: RestaurantsService,
+  ) { }
 
   @Post()
   create(@Body() createRestaurantDto: CreateRestaurantDto) {
@@ -27,11 +37,9 @@ export class RestaurantsController {
     @Param('id', ParseIntPipe) id: number,
     @Body() updateRestaurantDto: UpdateRestaurantDto,
   ) {
-    return this.restaurantsService.update(id, updateRestaurantDto);
-  }
-
-  @Patch(':id/toggle-status')
-  toggleStatus(@Param('id', ParseIntPipe) id: number) {
-    return this.restaurantsService.toggleStatus(id);
+    return this.restaurantsService.update(
+      id,
+      updateRestaurantDto,
+    );
   }
 }

@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto.js';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto.js';
@@ -35,10 +35,7 @@ export class RestaurantsService {
         return restaurant;
     }
 
-    async update(
-        id: number,
-        updateRestaurantDto: UpdateRestaurantDto,
-    ) {
+    async update(id: number, updateRestaurantDto: UpdateRestaurantDto) {
         await this.findOne(id);
 
         return this.prisma.restaurant.update({
@@ -46,16 +43,4 @@ export class RestaurantsService {
             data: updateRestaurantDto,
         });
     }
-
-    async toggleStatus(id: number) {
-        const restaurant = await this.findOne(id);
-
-        return this.prisma.restaurant.update({
-            where: { id },
-            data: {
-                isActive: !restaurant.isActive,
-            },
-        });
-    }
-
 }
