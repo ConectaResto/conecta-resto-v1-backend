@@ -24,6 +24,9 @@ export class RestaurantsService {
     async findOne(id: number) {
         const restaurant = await this.prisma.restaurant.findUnique({
             where: { id },
+            include: {
+                categories: true,
+            },
         });
 
         if (!restaurant) {

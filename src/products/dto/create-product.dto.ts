@@ -1,4 +1,3 @@
-import { Type } from 'class-transformer';
 import {
     IsInt,
     IsNotEmpty,
@@ -19,8 +18,7 @@ export class CreateProductDto {
     @IsString()
     description?: string;
 
-    @Type(() => Number)
-    @IsNumber({ allowNaN: false, allowInfinity: false })
+    @IsNumber({ maxDecimalPlaces: 2 })
     @Min(0)
     price: number;
 
@@ -29,13 +27,7 @@ export class CreateProductDto {
     @MaxLength(500)
     image?: string;
 
-    @Type(() => Number)
     @IsInt()
-    @Min(1)
+    @IsNotEmpty()
     restaurantId: number;
-
-    @Type(() => Number)
-    @IsInt()
-    @Min(1)
-    categoryId: number;
 }
