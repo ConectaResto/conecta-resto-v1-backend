@@ -6,6 +6,7 @@ import { RestaurantsModule } from './restaurants/restaurants.module.js';
 import { ProductsModule } from './products/products.module.js';
 import { CategoriesModule } from './categories/categories.module.js';
 import { UsersModule } from './users/users.module.js';
+import { TablesModule } from './tables/tables.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -19,6 +20,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     ProductsModule,
     CategoriesModule,
     UsersModule,
+    TablesModule,
   ],
 })
 export class AppModule { }
