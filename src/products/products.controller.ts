@@ -11,9 +11,9 @@ import {
   Post,
 } from '@nestjs/common';
 import { ProductsService } from './products.service.js';
-import { CreateProductDto } from './dto/create-product.dto.js';
-import { AssignCategoriesDto } from './dto/assign-categories.dto.js';
-import { UpdateProductDto } from './dto/update-product.dto.js';
+import { CreateProductDto } from './dto/requests/create-product.dto.js';
+import { AssignCategoriesDto } from './dto/requests/assign-categories.dto.js';
+import { UpdateProductDto } from './dto/requests/update-product.dto.js';
 
 @Controller('products')
 export class ProductsController {

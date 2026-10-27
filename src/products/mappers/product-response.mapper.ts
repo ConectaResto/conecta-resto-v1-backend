@@ -1,5 +1,5 @@
 import { Prisma } from "../../../generated/prisma/client.js";
-import { ProductResponseDto } from "../dto/product-response.dto.js";
+import { ProductResponseDto } from "../dto/responses/product-response.dto.js";
 
 type ProductWithCategories = Prisma.ProductGetPayload<{
     include: {
