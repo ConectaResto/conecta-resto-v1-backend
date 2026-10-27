@@ -28,6 +28,7 @@ model Restaurant {
   products   Product[]
   categories Category[]
   users      User[]
+  tables     Table[]
 
   @@map("restaurants")
 }
@@ -88,4 +89,18 @@ model User {
 
   @@index([restaurantId])
   @@map("users")
+}
+
+model Table {
+  id           Int      @id @default(autoincrement())
+  number       Int
+  isAvailable  Boolean  @default(true) @map("is_available")
+  restaurantId Int      @map("restaurant_id")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id])
+
+  @@unique([number, restaurantId])
+  @@index([restaurantId])
+  @@map("tables")
 }
