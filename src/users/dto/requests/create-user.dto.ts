@@ -1,4 +1,3 @@
-import { Type } from 'class-transformer';
 import {
     IsEmail,
     IsEnum,
@@ -7,10 +6,9 @@ import {
     IsOptional,
     IsString,
     MaxLength,
-    Min,
     MinLength,
 } from 'class-validator';
-import { UserRole } from '../../../generated/prisma/enums.js';
+import { UserRole } from '../../../../generated/prisma/enums.js';
 
 export class CreateUserDto {
     @IsString()
@@ -31,8 +29,6 @@ export class CreateUserDto {
     role: UserRole;
 
     @IsOptional()
-    @Type(() => Number)
     @IsInt()
-    @Min(1)
-    restaurantId?: number;
+    restaurantId?: number | null;
 }
