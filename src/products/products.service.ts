@@ -3,9 +3,9 @@ import {
     NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { CreateProductDto } from './dto/create-product.dto.js';
-import { UpdateProductDto } from './dto/update-product.dto.js';
-import { AssignCategoriesDto } from './dto/assign-categories.dto.js';
+import { CreateProductDto } from './dto/requests/create-product.dto.js';
+import { UpdateProductDto } from './dto/requests/update-product.dto.js';
+import { AssignCategoriesDto } from './dto/requests/assign-categories.dto.js';
 import { mapProductResponse } from './mappers/product-response.mapper.js';
 
 @Injectable()
