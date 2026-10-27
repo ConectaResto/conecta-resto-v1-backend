@@ -1,25 +1,12 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateCategoryDto } from './dto/create-category.dto.js';
 import { UpdateCategoryDto } from './dto/update-category.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { Prisma } from '../../generated/prisma/client.js';
+import { handlePrismaUniqueConstraintError } from '../common/utils/handle-prisma-unique-constraint.js';
 
 @Injectable()
 export class CategoriesService {
     constructor(private readonly prisma: PrismaService) { }
-
-    private handlePrismaError(error: unknown): never {
-        if (
-            error instanceof Prisma.PrismaClientKnownRequestError &&
-            error.code === 'P2002'
-        ) {
-            throw new ConflictException(
-                'A category with this name already exists in this restaurant',
-            );
-        }
-
-        throw error;
-    }
 
     // Create a category
     async create(createCategoryDto: CreateCategoryDto) {
@@ -40,7 +27,10 @@ export class CategoriesService {
                 data: createCategoryDto,
             });
         } catch (error) {
-            this.handlePrismaError(error);
+            handlePrismaUniqueConstraintError(
+                error,
+                'A category with this name already exists in this restaurant',
+            );
         }
     }
 
@@ -92,7 +82,10 @@ export class CategoriesService {
                 data: updateCategoryDto,
             });
         } catch (error) {
-            this.handlePrismaError(error);
+            handlePrismaUniqueConstraintError(
+                error,
+                'A category with this name already exists in this restaurant',
+            );
         }
     }
 
