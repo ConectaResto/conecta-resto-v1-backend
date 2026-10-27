@@ -1,12 +1,12 @@
 import {
-    ConflictException,
     Injectable,
     NotFoundException,
 } from '@nestjs/common';
+
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateTableDto } from './dto/create-table.dto.js';
-import { Prisma } from '../../generated/prisma/client.js';
 import { UpdateTableDto } from './dto/update-table.dto.js';
+import { handlePrismaUniqueConstraintError } from '../common/utils/handle-prisma-unique-constraint.js';
 
 @Injectable()
 export class TablesService {
@@ -37,16 +37,10 @@ export class TablesService {
                 },
             });
         } catch (error) {
-            if (
-                error instanceof Prisma.PrismaClientKnownRequestError &&
-                error.code === 'P2002'
-            ) {
-                throw new ConflictException(
-                    `Table number ${number} already exists in this restaurant`,
-                );
-            }
-
-            throw error;
+            handlePrismaUniqueConstraintError(
+                error,
+                `Table number ${number} already exists in this restaurant`,
+            );
         }
     }
 
@@ -91,16 +85,10 @@ export class TablesService {
                 },
             });
         } catch (error) {
-            if (
-                error instanceof Prisma.PrismaClientKnownRequestError &&
-                error.code === 'P2002'
-            ) {
-                throw new ConflictException(
-                    'A table with this number already exists in this restaurant',
-                );
-            }
-
-            throw error;
+            handlePrismaUniqueConstraintError(
+                error,
+                'A table with this number already exists in this restaurant',
+            );
         }
     }
 
@@ -112,4 +100,4 @@ export class TablesService {
             where: { id },
         });
     }
-}   
+}

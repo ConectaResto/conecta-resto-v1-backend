@@ -24,7 +24,7 @@ export class ProductsService {
             throw new NotFoundException('Restaurant not found');
         }
 
-        return this.prisma.product.create({
+        const product = await this.prisma.product.create({
             data: createProductDto,
             include: {
                 productCategories: {
@@ -34,6 +34,8 @@ export class ProductsService {
                 },
             },
         });
+
+        return mapProductResponse(product);
     }
 
     // Get all products
@@ -78,19 +80,28 @@ export class ProductsService {
     async update(id: number, updateProductDto: UpdateProductDto) {
         await this.findOne(id);
 
-        return this.prisma.product.update({
+        const product = await this.prisma.product.update({
             where: {
                 id,
             },
             data: updateProductDto,
+            include: {
+                productCategories: {
+                    include: {
+                        category: true,
+                    },
+                },
+            },
         });
+
+        return mapProductResponse(product);
     }
 
     // Delete product
     async remove(id: number) {
         await this.findOne(id);
 
-        return this.prisma.product.delete({
+        await this.prisma.product.delete({
             where: {
                 id,
             },
