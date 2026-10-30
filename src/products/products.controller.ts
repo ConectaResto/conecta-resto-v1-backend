@@ -9,13 +9,20 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import { ProductsService } from './products.service.js';
 import { CreateProductDto } from './dto/requests/create-product.dto.js';
 import { AssignCategoriesDto } from './dto/requests/assign-categories.dto.js';
 import { UpdateProductDto } from './dto/requests/update-product.dto.js';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { RolesGuard } from '../auth/guards/roles.guard.js';
+import { Roles } from '../auth/decorators/roles.decorator.js';
+import { UserRole } from '../../generated/prisma/enums.js';
 
 @Controller('products')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
 export class ProductsController {
   constructor(
     private readonly productsService: ProductsService,

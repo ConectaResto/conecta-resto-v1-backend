@@ -7,36 +7,39 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 import { CategoriesService } from './categories.service.js';
 import { CreateCategoryDto } from './dto/create-category.dto.js';
 import { UpdateCategoryDto } from './dto/update-category.dto.js';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { RolesGuard } from '../auth/guards/roles.guard.js';
+import { UserRole } from '../../generated/prisma/enums.js';
+import { Roles } from '../auth/decorators/roles.decorator.js';
 
 @Controller('categories')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
 export class CategoriesController {
   constructor(
     private readonly categoriesService: CategoriesService,
   ) { }
 
-  // Create a category
   @Post()
   create(@Body() createCategoryDto: CreateCategoryDto) {
     return this.categoriesService.create(createCategoryDto);
   }
 
-  // Get all categories
   @Get()
   findAll() {
     return this.categoriesService.findAll();
   }
 
-  // Get a category by ID
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.categoriesService.findOne(id);
   }
 
-  // Update a category
   @Patch(':id')
   update(
     @Param('id', ParseIntPipe) id: number,
@@ -48,7 +51,6 @@ export class CategoriesController {
     );
   }
 
-  // Delete a category
   @Delete(':id')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.categoriesService.remove(id);

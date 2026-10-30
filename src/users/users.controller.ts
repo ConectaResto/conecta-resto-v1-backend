@@ -6,14 +6,21 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  UseGuards,
 } from '@nestjs/common';
 
 import { UsersService } from './users.service.js';
 
 import { CreateUserDto } from './dto/requests/create-user.dto.js';
 import { UpdateUserDto } from './dto/requests/update-user.dto.js';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { RolesGuard } from '../auth/guards/roles.guard.js';
+import { Roles } from '../auth/decorators/roles.decorator.js';
+import { UserRole } from '../../generated/prisma/enums.js';
 
 @Controller('users')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
 export class UsersController {
   constructor(private readonly usersService: UsersService) { }
 
