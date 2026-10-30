@@ -1,7 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+    Injectable,
+    NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateRestaurantDto } from './dto/create-restaurant.dto.js';
 import { UpdateRestaurantDto } from './dto/update-restaurant.dto.js';
+import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface.js';
+import { UserRole } from '../../generated/prisma/enums.js';
 
 @Injectable()
 export class RestaurantsService {
@@ -21,7 +26,7 @@ export class RestaurantsService {
         });
     }
 
-    async findOne(id: number) {
+    async findOne(id: number, user: AuthenticatedRequest['user']) {
         const restaurant = await this.prisma.restaurant.findUnique({
             where: { id },
             include: {
@@ -29,7 +34,11 @@ export class RestaurantsService {
             },
         });
 
-        if (!restaurant) {
+        if (
+            !restaurant ||
+            (user.role !== UserRole.SUPER_ADMIN &&
+                user.restaurantId !== restaurant.id)
+        ) {
             throw new NotFoundException(
                 `Restaurant with ID ${id} was not found`,
             );
@@ -38,8 +47,12 @@ export class RestaurantsService {
         return restaurant;
     }
 
-    async update(id: number, updateRestaurantDto: UpdateRestaurantDto) {
-        await this.findOne(id);
+    async update(
+        id: number,
+        updateRestaurantDto: UpdateRestaurantDto,
+        user: AuthenticatedRequest['user'],
+    ) {
+        await this.findOne(id, user);
 
         return this.prisma.restaurant.update({
             where: { id },

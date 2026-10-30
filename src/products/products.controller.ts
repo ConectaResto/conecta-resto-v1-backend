@@ -9,6 +9,7 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import { ProductsService } from './products.service.js';
@@ -19,6 +20,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
 import { UserRole } from '../../generated/prisma/enums.js';
+import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface.js';
 
 @Controller('products')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -30,20 +32,29 @@ export class ProductsController {
 
   // Create product
   @Post()
-  create(@Body() createProductDto: CreateProductDto) {
-    return this.productsService.create(createProductDto);
+  create(
+    @Body() createProductDto: CreateProductDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.productsService.create(
+      createProductDto,
+      request.user,
+    );
   }
 
   // Get all products
   @Get()
-  findAll() {
-    return this.productsService.findAll();
+  findAll(@Req() request: AuthenticatedRequest) {
+    return this.productsService.findAll(request.user);
   }
 
   // Get product by ID
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.productsService.findOne(id);
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.productsService.findOne(id, request.user);
   }
 
   // Update product
@@ -51,15 +62,23 @@ export class ProductsController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateProductDto: UpdateProductDto,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.productsService.update(id, updateProductDto);
+    return this.productsService.update(
+      id,
+      updateProductDto,
+      request.user,
+    );
   }
 
   // Delete product
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.productsService.remove(id);
+  remove(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.productsService.remove(id, request.user);
   }
 
   // Assign categories to a product
@@ -67,10 +86,12 @@ export class ProductsController {
   assignCategories(
     @Param('id', ParseIntPipe) id: number,
     @Body() assignCategoriesDto: AssignCategoriesDto,
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.productsService.assignCategories(
       id,
       assignCategoriesDto,
+      request.user,
     );
   }
 
@@ -79,7 +100,12 @@ export class ProductsController {
   removeCategory(
     @Param('id', ParseIntPipe) id: number,
     @Param('categoryId', ParseIntPipe) categoryId: number,
+    @Req() request: AuthenticatedRequest,
   ) {
-    return this.productsService.removeCategory(id, categoryId);
+    return this.productsService.removeCategory(
+      id,
+      categoryId,
+      request.user,
+    );
   }
 }

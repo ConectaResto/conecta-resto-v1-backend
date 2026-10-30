@@ -7,16 +7,26 @@ import { CreateProductDto } from './dto/requests/create-product.dto.js';
 import { UpdateProductDto } from './dto/requests/update-product.dto.js';
 import { AssignCategoriesDto } from './dto/requests/assign-categories.dto.js';
 import { mapProductResponse } from './mappers/product-response.mapper.js';
+import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface.js';
+import { UserRole } from '../../generated/prisma/enums.js';
+
 
 @Injectable()
 export class ProductsService {
     constructor(private readonly prisma: PrismaService) { }
 
-    // Create product
-    async create(createProductDto: CreateProductDto) {
+    async create(
+        createProductDto: CreateProductDto,
+        user: AuthenticatedRequest['user'],
+    ) {
+        const restaurantId =
+            user.role === UserRole.SUPER_ADMIN
+                ? createProductDto.restaurantId
+                : user.restaurantId!;
+
         const restaurant = await this.prisma.restaurant.findUnique({
             where: {
-                id: createProductDto.restaurantId,
+                id: restaurantId,
             },
         });
 
@@ -25,7 +35,10 @@ export class ProductsService {
         }
 
         const product = await this.prisma.product.create({
-            data: createProductDto,
+            data: {
+                ...createProductDto,
+                restaurantId,
+            },
             include: {
                 productCategories: {
                     include: {
@@ -38,9 +51,12 @@ export class ProductsService {
         return mapProductResponse(product);
     }
 
-    // Get all products
-    async findAll() {
+    async findAll(user: AuthenticatedRequest['user']) {
         const products = await this.prisma.product.findMany({
+            where:
+                user.role === UserRole.SUPER_ADMIN
+                    ? {}
+                    : { restaurantId: user.restaurantId! },
             orderBy: {
                 createdAt: 'desc',
             },
@@ -56,10 +72,17 @@ export class ProductsService {
         return products.map(mapProductResponse);
     }
 
-    // Get product by ID
-    async findOne(id: number) {
-        const product = await this.prisma.product.findUnique({
-            where: { id },
+    async findOne(
+        id: number,
+        user: AuthenticatedRequest['user'],
+    ) {
+        const product = await this.prisma.product.findFirst({
+            where: {
+                id,
+                ...(user.role !== UserRole.SUPER_ADMIN && {
+                    restaurantId: user.restaurantId!,
+                }),
+            },
             include: {
                 productCategories: {
                     include: {
@@ -76,15 +99,24 @@ export class ProductsService {
         return mapProductResponse(product);
     }
 
-    // Update product
-    async update(id: number, updateProductDto: UpdateProductDto) {
-        await this.findOne(id);
+    async update(
+        id: number,
+        updateProductDto: UpdateProductDto,
+        user: AuthenticatedRequest['user'],
+    ) {
+        await this.findOne(id, user);
 
         const product = await this.prisma.product.update({
             where: {
                 id,
             },
-            data: updateProductDto,
+            data:
+                user.role === UserRole.SUPER_ADMIN
+                    ? updateProductDto
+                    : {
+                        ...updateProductDto,
+                        restaurantId: user.restaurantId!,
+                    },
             include: {
                 productCategories: {
                     include: {
@@ -97,9 +129,11 @@ export class ProductsService {
         return mapProductResponse(product);
     }
 
-    // Delete product
-    async remove(id: number) {
-        await this.findOne(id);
+    async remove(
+        id: number,
+        user: AuthenticatedRequest['user'],
+    ) {
+        await this.findOne(id, user);
 
         await this.prisma.product.delete({
             where: {
@@ -108,9 +142,12 @@ export class ProductsService {
         });
     }
 
-    // Assign categories to a product
-    async assignCategories(id: number, assignCategoriesDto: AssignCategoriesDto) {
-        const product = await this.findOne(id);
+    async assignCategories(
+        id: number,
+        assignCategoriesDto: AssignCategoriesDto,
+        user: AuthenticatedRequest['user'],
+    ) {
+        const product = await this.findOne(id, user);
 
         const categoryIds = [...new Set(assignCategoriesDto.categoryIds)];
 
@@ -122,7 +159,6 @@ export class ProductsService {
                 restaurantId: product.restaurantId,
             },
         });
-
 
         if (categories.length !== categoryIds.length) {
             throw new NotFoundException(
@@ -148,12 +184,15 @@ export class ProductsService {
             }
         });
 
-        return this.findOne(id);
+        return this.findOne(id, user);
     }
 
-    // Remove a category from a product
-    async removeCategory(id: number, categoryId: number) {
-        await this.findOne(id);
+    async removeCategory(
+        id: number,
+        categoryId: number,
+        user: AuthenticatedRequest['user'],
+    ) {
+        await this.findOne(id, user);
 
         const relation = await this.prisma.productCategory.findUnique({
             where: {
@@ -179,6 +218,6 @@ export class ProductsService {
             },
         });
 
-        return this.findOne(id);
+        return this.findOne(id, user);
     }
 }

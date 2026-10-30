@@ -7,14 +7,24 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateTableDto } from './dto/create-table.dto.js';
 import { UpdateTableDto } from './dto/update-table.dto.js';
 import { handlePrismaUniqueConstraintError } from '../common/utils/handle-prisma-unique-constraint.js';
+import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface.js';
+import { UserRole } from '../../generated/prisma/enums.js';
 
 @Injectable()
 export class TablesService {
     constructor(private readonly prisma: PrismaService) { }
 
     // Create a table
-    async create(createTableDto: CreateTableDto) {
-        const { number, restaurantId } = createTableDto;
+    async create(
+        createTableDto: CreateTableDto,
+        user: AuthenticatedRequest['user'],
+    ) {
+        const { number } = createTableDto;
+
+        const restaurantId =
+            user.role === UserRole.SUPER_ADMIN
+                ? createTableDto.restaurantId
+                : user.restaurantId!;
 
         const restaurant = await this.prisma.restaurant.findUnique({
             where: { id: restaurantId },
@@ -45,8 +55,12 @@ export class TablesService {
     }
 
     // Get all tables
-    async findAll() {
+    async findAll(user: AuthenticatedRequest['user']) {
         return this.prisma.table.findMany({
+            where:
+                user.role === UserRole.SUPER_ADMIN
+                    ? {}
+                    : { restaurantId: user.restaurantId! },
             include: {
                 restaurant: true,
             },
@@ -57,9 +71,17 @@ export class TablesService {
     }
 
     // Get a table by ID
-    async findOne(id: number) {
-        const table = await this.prisma.table.findUnique({
-            where: { id },
+    async findOne(
+        id: number,
+        user: AuthenticatedRequest['user'],
+    ) {
+        const table = await this.prisma.table.findFirst({
+            where: {
+                id,
+                ...(user.role !== UserRole.SUPER_ADMIN && {
+                    restaurantId: user.restaurantId!,
+                }),
+            },
             include: {
                 restaurant: true,
             },
@@ -73,13 +95,23 @@ export class TablesService {
     }
 
     // Update a table
-    async update(id: number, updateTableDto: UpdateTableDto) {
-        await this.findOne(id);
+    async update(
+        id: number,
+        updateTableDto: UpdateTableDto,
+        user: AuthenticatedRequest['user'],
+    ) {
+        const table = await this.findOne(id, user);
 
         try {
             return await this.prisma.table.update({
                 where: { id },
-                data: updateTableDto,
+                data:
+                    user.role === UserRole.SUPER_ADMIN
+                        ? updateTableDto
+                        : {
+                            ...updateTableDto,
+                            restaurantId: table.restaurantId,
+                        },
                 include: {
                     restaurant: true,
                 },
@@ -93,8 +125,11 @@ export class TablesService {
     }
 
     // Delete a table
-    async remove(id: number) {
-        await this.findOne(id);
+    async remove(
+        id: number,
+        user: AuthenticatedRequest['user'],
+    ) {
+        await this.findOne(id, user);
 
         await this.prisma.table.delete({
             where: { id },

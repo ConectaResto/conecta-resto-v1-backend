@@ -1,6 +1,7 @@
 import {
     IsInt,
     IsNotEmpty,
+    IsOptional,
     IsPositive,
 } from 'class-validator';
 
@@ -9,6 +10,7 @@ export class CreateTableDto {
     @IsPositive()
     number: number;
 
+    @IsOptional()
     @IsInt()
     @IsNotEmpty()
     @IsPositive()
