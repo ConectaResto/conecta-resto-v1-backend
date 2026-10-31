@@ -1,5 +1,6 @@
 import {
     BadRequestException,
+    ForbiddenException,
     Injectable,
     NotFoundException,
 } from '@nestjs/common';
@@ -19,17 +20,35 @@ import {
 import { handlePrismaUniqueConstraintError } from '../common/utils/handle-prisma-unique-constraint.js';
 
 import { UserRole } from '../../generated/prisma/client.js';
+import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface.js';
 
 @Injectable()
 export class UsersService {
     constructor(private readonly prisma: PrismaService) { }
 
-    async create(createUserDto: CreateUserDto) {
+    async create(
+        createUserDto: CreateUserDto,
+        currentUser: AuthenticatedRequest['user'],
+    ) {
         const { password, ...userData } = createUserDto;
+
+        if (
+            currentUser.role === UserRole.ADMIN &&
+            userData.role === UserRole.SUPER_ADMIN
+        ) {
+            throw new ForbiddenException(
+                'You cannot create a SUPER_ADMIN user.',
+            );
+        }
+
+        const restaurantId =
+            currentUser.role === UserRole.SUPER_ADMIN
+                ? userData.restaurantId
+                : currentUser.restaurantId!;
 
         this.validateRestaurantAssignment(
             userData.role,
-            userData.restaurantId,
+            restaurantId,
         );
 
         const passwordHash = await bcrypt.hash(password, 10);
@@ -38,6 +57,7 @@ export class UsersService {
             const user = await this.prisma.user.create({
                 data: {
                     ...userData,
+                    restaurantId,
                     passwordHash,
                 },
             });
@@ -51,15 +71,28 @@ export class UsersService {
         }
     }
 
-    async findAll() {
-        const users = await this.prisma.user.findMany();
+    async findAll(currentUser: AuthenticatedRequest['user']) {
+        const users = await this.prisma.user.findMany({
+            where:
+                currentUser.role === UserRole.SUPER_ADMIN
+                    ? {}
+                    : { restaurantId: currentUser.restaurantId! },
+        });
 
         return mapUserResponseList(users);
     }
 
-    async findOne(id: number) {
-        const user = await this.prisma.user.findUnique({
-            where: { id },
+    async findOne(
+        id: number,
+        currentUser: AuthenticatedRequest['user'],
+    ) {
+        const user = await this.prisma.user.findFirst({
+            where: {
+                id,
+                ...(currentUser.role !== UserRole.SUPER_ADMIN && {
+                    restaurantId: currentUser.restaurantId!,
+                }),
+            },
         });
 
         if (!user) {
@@ -71,30 +104,60 @@ export class UsersService {
         return mapUserResponse(user);
     }
 
-    async update(id: number, updateUserDto: UpdateUserDto) {
-        const currentUser = await this.prisma.user.findUnique({
-            where: { id },
+    async update(
+        id: number,
+        updateUserDto: UpdateUserDto,
+        currentUser: AuthenticatedRequest['user'],
+    ) {
+        const currentTargetUser = await this.prisma.user.findFirst({
+            where: {
+                id,
+                ...(currentUser.role !== UserRole.SUPER_ADMIN && {
+                    restaurantId: currentUser.restaurantId!,
+                }),
+            },
         });
 
-        if (!currentUser) {
+        if (!currentTargetUser) {
             throw new NotFoundException(
                 `User with ID ${id} not found.`,
             );
         }
 
+        if (
+            currentUser.role === UserRole.ADMIN &&
+            currentTargetUser.role === UserRole.SUPER_ADMIN
+        ) {
+            throw new ForbiddenException(
+                'You cannot modify a SUPER_ADMIN user.',
+            );
+        }
+
+        if (
+            currentUser.role === UserRole.ADMIN &&
+            updateUserDto.role === UserRole.SUPER_ADMIN
+        ) {
+            throw new ForbiddenException(
+                'You cannot assign the SUPER_ADMIN role.',
+            );
+        }
+
         const { password, ...userData } = updateUserDto;
 
-        const role = userData.role ?? currentUser.role;
+        const role = userData.role ?? currentTargetUser.role;
 
         const restaurantId =
-            userData.restaurantId !== undefined
-                ? userData.restaurantId
-                : currentUser.restaurantId;
+            currentUser.role === UserRole.SUPER_ADMIN
+                ? userData.restaurantId !== undefined
+                    ? userData.restaurantId
+                    : currentTargetUser.restaurantId
+                : currentUser.restaurantId!;
 
         this.validateRestaurantAssignment(role, restaurantId);
 
         const data = {
             ...userData,
+            restaurantId,
             passwordHash: password
                 ? await bcrypt.hash(password, 10)
                 : undefined,

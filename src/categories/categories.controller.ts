@@ -7,50 +7,68 @@ import {
   ParseIntPipe,
   Patch,
   Post,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import { CategoriesService } from './categories.service.js';
 import { CreateCategoryDto } from './dto/create-category.dto.js';
 import { UpdateCategoryDto } from './dto/update-category.dto.js';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
+import { RolesGuard } from '../auth/guards/roles.guard.js';
+import { UserRole } from '../../generated/prisma/enums.js';
+import { Roles } from '../auth/decorators/roles.decorator.js';
+import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface.js';
 
 @Controller('categories')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
 export class CategoriesController {
   constructor(
     private readonly categoriesService: CategoriesService,
   ) { }
 
-  // Create a category
   @Post()
-  create(@Body() createCategoryDto: CreateCategoryDto) {
-    return this.categoriesService.create(createCategoryDto);
+  create(
+    @Body() createCategoryDto: CreateCategoryDto,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.categoriesService.create(
+      createCategoryDto,
+      request.user,
+    );
   }
 
-  // Get all categories
   @Get()
-  findAll() {
-    return this.categoriesService.findAll();
+  findAll(@Req() request: AuthenticatedRequest) {
+    return this.categoriesService.findAll(request.user);
   }
 
-  // Get a category by ID
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.categoriesService.findOne(id);
+  findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.categoriesService.findOne(id, request.user);
   }
 
-  // Update a category
   @Patch(':id')
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateCategoryDto: UpdateCategoryDto,
+    @Req() request: AuthenticatedRequest,
   ) {
     return this.categoriesService.update(
       id,
       updateCategoryDto,
+      request.user,
     );
   }
 
-  // Delete a category
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.categoriesService.remove(id);
+  remove(
+    @Param('id', ParseIntPipe) id: number,
+    @Req() request: AuthenticatedRequest,
+  ) {
+    return this.categoriesService.remove(id, request.user);
   }
 }

@@ -18,6 +18,7 @@ export class CreateCategoryDto {
   @IsString()
   description?: string;
 
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)

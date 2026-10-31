@@ -3,28 +3,40 @@ import { CreateCategoryDto } from './dto/create-category.dto.js';
 import { UpdateCategoryDto } from './dto/update-category.dto.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { handlePrismaUniqueConstraintError } from '../common/utils/handle-prisma-unique-constraint.js';
+import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface.js';
+import { UserRole } from '../../generated/prisma/enums.js';
 
 @Injectable()
 export class CategoriesService {
     constructor(private readonly prisma: PrismaService) { }
 
-    // Create a category
-    async create(createCategoryDto: CreateCategoryDto) {
+    async create(
+        createCategoryDto: CreateCategoryDto,
+        user: AuthenticatedRequest['user'],
+    ) {
+        const restaurantId =
+            user.role === UserRole.SUPER_ADMIN
+                ? createCategoryDto.restaurantId
+                : user.restaurantId!;
+
         const restaurant = await this.prisma.restaurant.findUnique({
             where: {
-                id: createCategoryDto.restaurantId,
+                id: restaurantId,
             },
         });
 
         if (!restaurant) {
             throw new NotFoundException(
-                `Restaurant with ID ${createCategoryDto.restaurantId} was not found`,
+                `Restaurant with ID ${restaurantId} was not found`,
             );
         }
 
         try {
             return await this.prisma.category.create({
-                data: createCategoryDto,
+                data: {
+                    ...createCategoryDto,
+                    restaurantId,
+                },
             });
         } catch (error) {
             handlePrismaUniqueConstraintError(
@@ -34,9 +46,12 @@ export class CategoriesService {
         }
     }
 
-    // Get all categories
-    async findAll() {
+    async findAll(user: AuthenticatedRequest['user']) {
         return this.prisma.category.findMany({
+            where:
+                user.role === UserRole.SUPER_ADMIN
+                    ? {}
+                    : { restaurantId: user.restaurantId! },
             orderBy: {
                 createdAt: 'desc',
             },
@@ -50,10 +65,17 @@ export class CategoriesService {
         });
     }
 
-    // Get a category by ID
-    async findOne(id: number) {
-        const category = await this.prisma.category.findUnique({
-            where: { id },
+    async findOne(
+        id: number,
+        user: AuthenticatedRequest['user'],
+    ) {
+        const category = await this.prisma.category.findFirst({
+            where: {
+                id,
+                ...(user.role !== UserRole.SUPER_ADMIN && {
+                    restaurantId: user.restaurantId!,
+                }),
+            },
             include: {
                 productCategories: {
                     include: {
@@ -72,14 +94,23 @@ export class CategoriesService {
         return category;
     }
 
-    // Update a category
-    async update(id: number, updateCategoryDto: UpdateCategoryDto) {
-        await this.findOne(id);
+    async update(
+        id: number,
+        updateCategoryDto: UpdateCategoryDto,
+        user: AuthenticatedRequest['user'],
+    ) {
+        const category = await this.findOne(id, user);
 
         try {
             return await this.prisma.category.update({
                 where: { id },
-                data: updateCategoryDto,
+                data:
+                    user.role === UserRole.SUPER_ADMIN
+                        ? updateCategoryDto
+                        : {
+                            ...updateCategoryDto,
+                            restaurantId: category.restaurantId,
+                        },
             });
         } catch (error) {
             handlePrismaUniqueConstraintError(
@@ -89,9 +120,11 @@ export class CategoriesService {
         }
     }
 
-    // Delete a category
-    async remove(id: number) {
-        await this.findOne(id);
+    async remove(
+        id: number,
+        user: AuthenticatedRequest['user'],
+    ) {
+        await this.findOne(id, user);
 
         return this.prisma.category.delete({
             where: { id },

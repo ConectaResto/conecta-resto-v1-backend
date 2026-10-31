@@ -27,6 +27,7 @@ export class CreateProductDto {
     @MaxLength(500)
     image?: string;
 
+    @IsOptional()
     @IsInt()
     @IsNotEmpty()
     restaurantId: number;
