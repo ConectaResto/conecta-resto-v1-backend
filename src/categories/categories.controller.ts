@@ -21,13 +21,13 @@ import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-requ
 
 @Controller('categories')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
 export class CategoriesController {
   constructor(
     private readonly categoriesService: CategoriesService,
   ) { }
 
   @Post()
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   create(
     @Body() createCategoryDto: CreateCategoryDto,
     @Req() request: AuthenticatedRequest,
@@ -39,11 +39,13 @@ export class CategoriesController {
   }
 
   @Get()
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER)
   findAll(@Req() request: AuthenticatedRequest) {
     return this.categoriesService.findAll(request.user);
   }
 
   @Get(':id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER)
   findOne(
     @Param('id', ParseIntPipe) id: number,
     @Req() request: AuthenticatedRequest,
@@ -52,6 +54,7 @@ export class CategoriesController {
   }
 
   @Patch(':id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateCategoryDto: UpdateCategoryDto,
@@ -65,6 +68,7 @@ export class CategoriesController {
   }
 
   @Delete(':id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   remove(
     @Param('id', ParseIntPipe) id: number,
     @Req() request: AuthenticatedRequest,

@@ -1,5 +1,6 @@
 import {
     Injectable,
+    ForbiddenException,
     NotFoundException,
 } from '@nestjs/common';
 
@@ -105,6 +106,18 @@ export class TablesService {
     ) {
         const table = await this.findOne(id, user);
 
+        if (user.role === UserRole.WAITER) {
+            const updateKeys = Object.keys(updateTableDto);
+            const hasNonAvailabilityUpdate = updateKeys.some(
+                (key) => key !== 'isAvailable',
+            );
+            if (hasNonAvailabilityUpdate) {
+                throw new ForbiddenException(
+                    'Waiters can only update table availability (isAvailable)',
+                );
+            }
+        }
+
         try {
             return await this.prisma.table.update({
                 where: { id },
@@ -112,9 +125,9 @@ export class TablesService {
                     user.role === UserRole.SUPER_ADMIN
                         ? updateTableDto
                         : {
-                            ...updateTableDto,
-                            restaurantId: table.restaurantId,
-                        },
+                              ...updateTableDto,
+                              restaurantId: table.restaurantId,
+                          },
                 include: {
                     restaurant: true,
                 },

@@ -1,5 +1,6 @@
 import {
     Injectable,
+    ForbiddenException,
     NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -53,6 +54,12 @@ export class RestaurantsService {
         user: AuthenticatedRequest['user'],
     ) {
         await this.findOne(id, user);
+
+        if (user.role === UserRole.ADMIN && 'isActive' in updateRestaurantDto) {
+            throw new ForbiddenException(
+                'ADMIN cannot modify restaurant isActive status',
+            );
+        }
 
         return this.prisma.restaurant.update({
             where: { id },

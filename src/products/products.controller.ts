@@ -24,7 +24,6 @@ import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-requ
 
 @Controller('products')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
 export class ProductsController {
   constructor(
     private readonly productsService: ProductsService,
@@ -32,6 +31,7 @@ export class ProductsController {
 
   // Create product
   @Post()
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   create(
     @Body() createProductDto: CreateProductDto,
     @Req() request: AuthenticatedRequest,
@@ -44,12 +44,14 @@ export class ProductsController {
 
   // Get all products
   @Get()
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER)
   findAll(@Req() request: AuthenticatedRequest) {
     return this.productsService.findAll(request.user);
   }
 
   // Get product by ID
   @Get(':id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER)
   findOne(
     @Param('id', ParseIntPipe) id: number,
     @Req() request: AuthenticatedRequest,
@@ -59,6 +61,7 @@ export class ProductsController {
 
   // Update product
   @Patch(':id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateProductDto: UpdateProductDto,
@@ -73,6 +76,7 @@ export class ProductsController {
 
   // Delete product
   @Delete(':id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(
     @Param('id', ParseIntPipe) id: number,
@@ -83,6 +87,7 @@ export class ProductsController {
 
   // Assign categories to a product
   @Post(':id/categories')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   assignCategories(
     @Param('id', ParseIntPipe) id: number,
     @Body() assignCategoriesDto: AssignCategoriesDto,
@@ -97,6 +102,7 @@ export class ProductsController {
 
   // Remove a category from a product
   @Delete(':id/categories/:categoryId')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   removeCategory(
     @Param('id', ParseIntPipe) id: number,
     @Param('categoryId', ParseIntPipe) categoryId: number,
