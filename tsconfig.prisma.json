@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2022",
+    "outDir": "generated/prisma",
+    "rootDir": "generated/prisma",
+    "declaration": false,
+    "skipLibCheck": true
+  },
+  "include": ["generated/prisma/**/*.ts"],
+  "exclude": [
+    "generated/prisma/**/*.browser.ts",
+    "generated/prisma/internal/**/*.browser.ts"
+  ]
+}

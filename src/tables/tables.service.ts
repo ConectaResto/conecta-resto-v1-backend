@@ -57,10 +57,12 @@ export class TablesService {
     // Get all tables
     async findAll(user: AuthenticatedRequest['user']) {
         return this.prisma.table.findMany({
-            where:
-                user.role === UserRole.SUPER_ADMIN
+            where: {
+                isActive: true,
+                ...(user.role === UserRole.SUPER_ADMIN
                     ? {}
-                    : { restaurantId: user.restaurantId! },
+                    : { restaurantId: user.restaurantId! }),
+            },
             include: {
                 restaurant: true,
             },
@@ -78,6 +80,7 @@ export class TablesService {
         const table = await this.prisma.table.findFirst({
             where: {
                 id,
+                isActive: true,
                 ...(user.role !== UserRole.SUPER_ADMIN && {
                     restaurantId: user.restaurantId!,
                 }),
@@ -124,15 +127,16 @@ export class TablesService {
         }
     }
 
-    // Delete a table
+    // Delete a table (soft delete)
     async remove(
         id: number,
         user: AuthenticatedRequest['user'],
     ) {
-        await this.findOne(id, user);
+        const table = await this.findOne(id, user);
 
-        await this.prisma.table.delete({
+        await this.prisma.table.update({
             where: { id },
+            data: { isActive: false },
         });
     }
 }
