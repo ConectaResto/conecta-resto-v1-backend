@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { ProductsService } from './products.service.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { CreateProductDto } from './dto/requests/create-product.dto.js';
 import { UserRole } from '../../generated/prisma/enums.js';
 
@@ -149,6 +150,58 @@ describe('ProductsService', () => {
       name: 'New Product',
       price: '5000',
       restaurantId: 1,
+    });
+  });
+
+  it('ADMIN no puede consultar un producto de otro restaurante (NotFoundException)', async () => {
+    prisma.product.findFirst = vi.fn().mockResolvedValue(null);
+
+    await expect(service.findOne(2, adminUser)).rejects.toThrow(NotFoundException);
+
+    expect(prisma.product.findFirst).toHaveBeenCalledWith({
+      where: { id: 2, restaurantId: 1 },
+      include: { productCategories: { include: { category: true } } },
+    });
+  });
+
+  it('SUPER_ADMIN puede consultar todos los productos (findAll sin filtro restaurantId)', async () => {
+    const superAdminUser = { sub: 1, role: UserRole.SUPER_ADMIN, restaurantId: null };
+    const mockProducts = [
+      { id: 1, name: 'Coca Cola', price: 2500, restaurantId: 1, productCategories: [] },
+      { id: 2, name: 'Pepsi', price: 2000, restaurantId: 2, productCategories: [] },
+    ];
+
+    prisma.product.findMany = vi.fn().mockResolvedValue(mockProducts);
+
+    const result = await service.findAll(superAdminUser);
+
+    expect(result).toHaveLength(2);
+    expect(prisma.product.findMany).toHaveBeenCalledWith({
+      where: {},
+      orderBy: { createdAt: 'desc' },
+      include: { productCategories: { include: { category: true } } },
+    });
+  });
+
+  it('SUPER_ADMIN puede consultar cualquier producto (findOne sin filtro restaurantId)', async () => {
+    const superAdminUser = { sub: 1, role: UserRole.SUPER_ADMIN, restaurantId: null };
+    const mockProduct = {
+      id: 2,
+      name: 'Pepsi',
+      price: 2000,
+      restaurantId: 2,
+      productCategories: [],
+    };
+
+    prisma.product.findFirst = vi.fn().mockResolvedValue(mockProduct);
+
+    const result = await service.findOne(2, superAdminUser);
+
+    expect(result.name).toEqual('Pepsi');
+    expect(result.restaurantId).toEqual(2);
+    expect(prisma.product.findFirst).toHaveBeenCalledWith({
+      where: { id: 2 },
+      include: { productCategories: { include: { category: true } } },
     });
   });
 });

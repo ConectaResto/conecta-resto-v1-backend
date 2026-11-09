@@ -150,4 +150,56 @@ describe('CategoriesService', () => {
 
     expect(result).toEqual(mockCategory);
   });
+
+  it('ADMIN no puede consultar una categoría de otro restaurante (NotFoundException)', async () => {
+    vi.spyOn(prisma.category, 'findFirst').mockResolvedValue(null);
+
+    await expect(service.findOne(2, adminUser)).rejects.toThrow(NotFoundException);
+
+    expect(prisma.category.findFirst).toHaveBeenCalledWith({
+      where: { id: 2, restaurantId: 1 },
+      include: { productCategories: { include: { product: true } } },
+    });
+  });
+
+  it('SUPER_ADMIN puede consultar todas las categorías (findAll sin filtro restaurantId)', async () => {
+    const superAdminUser = { sub: 1, role: UserRole.SUPER_ADMIN, restaurantId: null };
+    const mockCategories = [
+      { id: 1, name: 'Bebidas', restaurantId: 1, isActive: true, createdAt: new Date(), description: null },
+      { id: 2, name: 'Comida', restaurantId: 2, isActive: true, createdAt: new Date(), description: null },
+    ];
+
+    vi.spyOn(prisma.category, 'findMany').mockResolvedValue(mockCategories);
+
+    const result = await service.findAll(superAdminUser);
+
+    expect(result).toEqual(mockCategories);
+    expect(prisma.category.findMany).toHaveBeenCalledWith({
+      where: {},
+      orderBy: { createdAt: 'desc' },
+      include: { productCategories: { include: { product: true } } },
+    });
+  });
+
+  it('SUPER_ADMIN puede consultar cualquier categoría (findOne sin filtro restaurantId)', async () => {
+    const superAdminUser = { sub: 1, role: UserRole.SUPER_ADMIN, restaurantId: null };
+    const mockCategory = {
+      id: 2,
+      name: 'Comida',
+      restaurantId: 2,
+      isActive: true,
+      createdAt: new Date(),
+      description: null,
+    };
+
+    vi.spyOn(prisma.category, 'findFirst').mockResolvedValue(mockCategory);
+
+    const result = await service.findOne(2, superAdminUser);
+
+    expect(result).toEqual(mockCategory);
+    expect(prisma.category.findFirst).toHaveBeenCalledWith({
+      where: { id: 2 },
+      include: { productCategories: { include: { product: true } } },
+    });
+  });
 });

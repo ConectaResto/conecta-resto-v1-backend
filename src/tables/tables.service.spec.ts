@@ -187,4 +187,72 @@ describe('TablesService', () => {
       data: { isActive: false },
     });
   });
+
+  it('ADMIN no puede consultar una mesa de otro restaurante (NotFoundException)', async () => {
+    const adminUser = { sub: 1, role: UserRole.ADMIN, restaurantId: 1 };
+
+    prisma.table.findFirst = vi.fn().mockResolvedValue(null);
+
+    await expect(service.findOne(2, adminUser)).rejects.toThrow(NotFoundException);
+
+    expect(prisma.table.findFirst).toHaveBeenCalledWith({
+      where: { id: 2, isActive: true, restaurantId: 1 },
+      include: { restaurant: true },
+    });
+  });
+
+  it('WAITER no puede actualizar una mesa de otro restaurante (NotFoundException)', async () => {
+    const waiterUser = { sub: 2, role: UserRole.WAITER, restaurantId: 1 };
+
+    prisma.table.findFirst = vi.fn().mockResolvedValue(null);
+
+    await expect(
+      service.update(2, { isAvailable: false }, waiterUser),
+    ).rejects.toThrow(NotFoundException);
+
+    expect(prisma.table.findFirst).toHaveBeenCalledWith({
+      where: { id: 2, isActive: true, restaurantId: 1 },
+      include: { restaurant: true },
+    });
+  });
+
+  it('SUPER_ADMIN puede consultar todas las mesas (findAll sin filtro restaurantId)', async () => {
+    const superAdminUser = { sub: 1, role: UserRole.SUPER_ADMIN, restaurantId: null };
+    const mockTables = [
+      { id: 1, number: 1, isActive: true, isAvailable: true, restaurantId: 1 },
+      { id: 2, number: 2, isActive: true, isAvailable: true, restaurantId: 2 },
+    ];
+
+    prisma.table.findMany = vi.fn().mockResolvedValue(mockTables);
+
+    const result = await service.findAll(superAdminUser);
+
+    expect(result).toEqual(mockTables);
+    expect(prisma.table.findMany).toHaveBeenCalledWith({
+      where: { isActive: true },
+      include: { restaurant: true },
+      orderBy: { number: 'asc' },
+    });
+  });
+
+  it('SUPER_ADMIN puede consultar cualquier mesa (findOne sin filtro restaurantId)', async () => {
+    const superAdminUser = { sub: 1, role: UserRole.SUPER_ADMIN, restaurantId: null };
+    const mockTable = {
+      id: 2,
+      number: 2,
+      isActive: true,
+      isAvailable: true,
+      restaurantId: 2,
+    };
+
+    prisma.table.findFirst = vi.fn().mockResolvedValue(mockTable);
+
+    const result = await service.findOne(2, superAdminUser);
+
+    expect(result).toEqual(mockTable);
+    expect(prisma.table.findFirst).toHaveBeenCalledWith({
+      where: { id: 2, isActive: true },
+      include: { restaurant: true },
+    });
+  });
 });

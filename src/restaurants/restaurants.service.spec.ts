@@ -167,4 +167,44 @@ describe('RestaurantsService', () => {
       data: createDto,
     });
   });
+
+  it('SUPER_ADMIN puede consultar todos los restaurantes (findAll sin filtro restaurantId)', async () => {
+    const mockRestaurants = [
+      { id: 1, name: 'Restaurant 1', restaurantId: 1, isActive: true, products: [], categories: [], users: [], tables: [] },
+      { id: 2, name: 'Restaurant 2', restaurantId: 2, isActive: true, products: [], categories: [], users: [], tables: [] },
+    ];
+
+    prisma.restaurant.findMany = vi.fn().mockResolvedValue(mockRestaurants);
+
+    const result = await service.findAll();
+
+    expect(result).toEqual(mockRestaurants);
+    expect(prisma.restaurant.findMany).toHaveBeenCalledWith({
+      orderBy: { createdAt: 'desc' },
+    });
+  });
+
+  it('SUPER_ADMIN puede consultar cualquier restaurante (findOne sin filtro restaurantId)', async () => {
+    const superAdminUser = { sub: 2, role: UserRole.SUPER_ADMIN, restaurantId: null };
+    const mockRestaurant = {
+      id: 2,
+      name: 'Restaurant 2',
+      restaurantId: 2,
+      isActive: true,
+      products: [],
+      categories: [],
+      users: [],
+      tables: [],
+    };
+
+    prisma.restaurant.findUnique = vi.fn().mockResolvedValue(mockRestaurant);
+
+    const result = await service.findOne(2, superAdminUser);
+
+    expect(result).toEqual(mockRestaurant);
+    expect(prisma.restaurant.findUnique).toHaveBeenCalledWith({
+      where: { id: 2 },
+      include: { categories: true },
+    });
+  });
 });
