@@ -14,6 +14,33 @@ describe('ServiceRequestService', () => {
   const adminUser = { sub: 1, role: UserRole.ADMIN, restaurantId: 1 };
   const superAdminUser = { sub: 4, role: UserRole.SUPER_ADMIN, restaurantId: null };
 
+  const mockTableRow = [{ id: 1, restaurant_id: 1, is_active: 1 }];
+  const mockRestaurant = {
+    id: 1,
+    name: 'Test Restaurant',
+    address: 'Calle 1',
+    phone: '3001234567',
+    email: 'test@test.com',
+    isActive: true,
+    createdAt: new Date(),
+  };
+  const mockService = {
+    id: 1,
+    tableId: 1,
+    restaurantId: 1,
+    status: 'ACTIVE',
+    createdAt: new Date(),
+    closedAt: null,
+  };
+  const mockClosedService = {
+    id: 1,
+    tableId: 1,
+    restaurantId: 1,
+    status: 'INACTIVE',
+    createdAt: new Date(),
+    closedAt: new Date(),
+  };
+
   beforeEach(async () => {
     mockPrisma = {
       $queryRaw: vi.fn(),
@@ -52,25 +79,6 @@ describe('ServiceRequestService', () => {
 
   it('QR válido, sin servicio ACTivo → crea servicio ACTIVE', async () => {
     const qrToken = 'test-qr-token-123';
-    const mockTableRow = [{ id: 1, restaurant_id: 1, is_active: 1 }];
-    const mockRestaurant = {
-      id: 1,
-      name: 'Test Restaurant',
-      address: 'Calle 1',
-      phone: '3001234567',
-      email: 'test@test.com',
-      isActive: true,
-      createdAt: new Date(),
-    };
-    const mockService = {
-      id: 1,
-      tableId: 1,
-      restaurantId: 1,
-      status: 'ACTIVE',
-      createdAt: new Date(),
-      closedAt: null,
-    };
-
     vi.mocked(mockPrisma.$queryRaw).mockResolvedValueOnce(mockTableRow);
     vi.mocked(mockPrisma.restaurant.findUnique).mockResolvedValue(mockRestaurant);
     vi.mocked(mockPrisma.serviceRequest.findFirst).mockResolvedValue(null);
@@ -92,18 +100,8 @@ describe('ServiceRequestService', () => {
     });
   });
 
-  it('QR válido, ya existe servicio ACTIVE → reutiliza (no crea)', async () => {
+  it('QR válido, ya existe servicio ACTivo → reutiliza (no crea)', async () => {
     const qrToken = 'test-qr-token-123';
-    const mockTableRow = [{ id: 1, restaurant_id: 1, is_active: 1 }];
-    const mockRestaurant = {
-      id: 1,
-      name: 'Test Restaurant',
-      address: 'Calle 1',
-      phone: '3001234567',
-      email: 'test@test.com',
-      isActive: true,
-      createdAt: new Date(),
-    };
     const mockExistingService = {
       id: 5,
       tableId: 1,
@@ -126,23 +124,17 @@ describe('ServiceRequestService', () => {
   it('QR inválido o inexistente → NotFoundException', async () => {
     vi.mocked(mockPrisma.$queryRaw).mockResolvedValueOnce([]);
 
-    await expect(
-      service.findOrCreateActiveFromQr('invalid-token'),
-    ).rejects.toThrow(NotFoundException);
+    await expect(service.findOrCreateActiveFromQr('invalid-token')).rejects.toThrow(NotFoundException);
   });
 
   it('Mesa inactiva → NotFoundException', async () => {
-    // SQL filtra por is_active = 1, así que mesa inactiva no devuelve filas
     vi.mocked(mockPrisma.$queryRaw).mockResolvedValueOnce([]);
 
-    await expect(
-      service.findOrCreateActiveFromQr('some-token'),
-    ).rejects.toThrow(NotFoundException);
+    await expect(service.findOrCreateActiveFromQr('some-token')).rejects.toThrow(NotFoundException);
   });
 
   it('Restaurante inactivo → ForbiddenException', async () => {
-    const mockTableRow = [{ id: 1, restaurant_id: 1, is_active: 1 }];
-    const mockRestaurant = {
+    const mockRestaurantInactive = {
       id: 1,
       name: 'Test Restaurant',
       address: 'Calle 1',
@@ -153,11 +145,9 @@ describe('ServiceRequestService', () => {
     };
 
     vi.mocked(mockPrisma.$queryRaw).mockResolvedValueOnce(mockTableRow);
-    vi.mocked(mockPrisma.restaurant.findUnique).mockResolvedValue(mockRestaurant);
+    vi.mocked(mockPrisma.restaurant.findUnique).mockResolvedValue(mockRestaurantInactive);
 
-    await expect(
-      service.findOrCreateActiveFromQr('some-token'),
-    ).rejects.toThrow(ForbiddenException);
+    await expect(service.findOrCreateActiveFromQr('some-token')).rejects.toThrow(ForbiddenException);
   });
 
   it('SUPER_ADMIN consulta todos los servicios → sin filtro restaurantId', async () => {
@@ -248,7 +238,7 @@ describe('ServiceRequestService', () => {
     });
   });
 
-  it('WAITER cierra servicio de su restaurante → CLOSED con closedAt', async () => {
+  it('WAITER cierra servicio de su restaurante → INACTIVE con closedAt', async () => {
     const mockService = {
       id: 1,
       tableId: 1,
@@ -256,15 +246,6 @@ describe('ServiceRequestService', () => {
       status: 'ACTIVE',
       createdAt: new Date(),
       closedAt: null,
-    };
-    const mockTableRow = [{ id: 1, restaurant_id: 1 }];
-    const mockClosedService = {
-      id: 1,
-      tableId: 1,
-      restaurantId: 1,
-      status: 'CLOSED',
-      createdAt: new Date(),
-      closedAt: new Date(),
     };
 
     vi.mocked(mockPrisma.serviceRequest.findUnique).mockResolvedValue(mockService);
@@ -274,12 +255,12 @@ describe('ServiceRequestService', () => {
 
     const result = await service.close(1, waiterUser);
 
-    expect(result.status).toEqual('CLOSED');
+    expect(result.status).toEqual('INACTIVE');
     expect(result.closedAt).toBeDefined();
     expect(mockPrisma.serviceRequest.update).toHaveBeenCalledWith({
       where: { id: 1 },
       data: {
-        status: 'CLOSED',
+        status: 'INACTIVE',
         closedAt: expect.any(Date),
       },
     });
@@ -296,9 +277,7 @@ describe('ServiceRequestService', () => {
     });
     vi.mocked(mockPrisma.$queryRaw).mockResolvedValue([{ id: 1, restaurant_id: 1 }]);
 
-    await expect(
-      service.close(1, cashierUser),
-    ).rejects.toThrow(ForbiddenException);
+    await expect(service.close(1, cashierUser)).rejects.toThrow(ForbiddenException);
   });
 
   it('WAITER intenta cerrar servicio de otro restaurante → ForbiddenException', async () => {
@@ -312,8 +291,6 @@ describe('ServiceRequestService', () => {
     });
     vi.mocked(mockPrisma.$queryRaw).mockResolvedValue([{ id: 2, restaurant_id: 2 }]);
 
-    await expect(
-      service.close(1, waiterUser),
-    ).rejects.toThrow(ForbiddenException);
+    await expect(service.close(1, waiterUser)).rejects.toThrow(ForbiddenException);
   });
 });

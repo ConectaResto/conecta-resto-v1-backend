@@ -45,12 +45,12 @@ export class OrdersService {
             }
 
             // 3. Buscar o crear servicio ACTIVE para esta mesa
-            let service = await prisma.serviceRequest.findFirst({
+            let service = await prisma.service.findFirst({
                 where: { tableId: table.id, status: 'ACTIVE' },
             });
 
             if (!service) {
-                service = await prisma.serviceRequest.create({
+                service = await prisma.service.create({
                     data: {
                         tableId: table.id,
                         restaurantId: table.restaurant_id,
