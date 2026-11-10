@@ -9,6 +9,7 @@ import { UsersModule } from './users/users.module.js';
 import { TablesModule } from './tables/tables.module.js';
 import { AuthModule } from './auth/auth.module.js';
 import { ServiceRequestModule } from './service-requests/service-request.module.js';
+import { OrdersModule } from './orders/orders.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -25,6 +26,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     TablesModule,
     AuthModule,
     ServiceRequestModule,
+    OrdersModule,
   ],
 })
 export class AppModule { }
