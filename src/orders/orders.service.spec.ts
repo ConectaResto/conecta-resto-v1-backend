@@ -19,7 +19,7 @@ describe('OrdersService', () => {
       restaurant: {
         findUnique: vi.fn(),
       },
-      serviceRequest: {
+      service: {
         findFirst: vi.fn(),
         create: vi.fn(),
       },
@@ -99,8 +99,8 @@ describe('OrdersService', () => {
 
     vi.mocked(mockPrisma.$queryRaw).mockResolvedValueOnce(mockTableRow);
     vi.mocked(mockPrisma.restaurant.findUnique).mockResolvedValue(mockRestaurant);
-    vi.mocked(mockPrisma.serviceRequest.findFirst).mockResolvedValue(null);
-    vi.mocked(mockPrisma.serviceRequest.create).mockResolvedValue({
+    vi.mocked(mockPrisma.service.findFirst).mockResolvedValue(null);
+    vi.mocked(mockPrisma.service.create).mockResolvedValue({
       id: 1,
       tableId: 1,
       restaurantId: 1,
@@ -197,8 +197,8 @@ describe('OrdersService', () => {
 
     vi.mocked(mockPrisma.$queryRaw).mockResolvedValueOnce(mockTableRow);
     vi.mocked(mockPrisma.restaurant.findUnique).mockResolvedValue(mockRestaurant);
-    vi.mocked(mockPrisma.serviceRequest.findFirst).mockResolvedValue(null);
-    vi.mocked(mockPrisma.serviceRequest.create).mockResolvedValue({
+    vi.mocked(mockPrisma.service.findFirst).mockResolvedValue(null);
+    vi.mocked(mockPrisma.service.create).mockResolvedValue({
       id: 1,
       tableId: 1,
       restaurantId: 1,
@@ -226,8 +226,8 @@ describe('OrdersService', () => {
 
     vi.mocked(mockPrisma.$queryRaw).mockResolvedValueOnce(mockTableRow);
     vi.mocked(mockPrisma.restaurant.findUnique).mockResolvedValue(mockRestaurant);
-    vi.mocked(mockPrisma.serviceRequest.findFirst).mockResolvedValue(null);
-    vi.mocked(mockPrisma.serviceRequest.create).mockResolvedValue({
+    vi.mocked(mockPrisma.service.findFirst).mockResolvedValue(null);
+    vi.mocked(mockPrisma.service.create).mockResolvedValue({
       id: 1,
       tableId: 1,
       restaurantId: 1,

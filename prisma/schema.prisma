@@ -18,7 +18,7 @@ enum UserRole {
 
 enum ServiceStatus {
   ACTIVE
-  CLOSED
+  INACTIVE
 
   @@map("service_status")
 }
@@ -44,6 +44,7 @@ model Restaurant {
   users            User[]
   tables           Table[]
   serviceRequests  ServiceRequest[]
+  services         Service[]
 
   @@map("restaurants")
 }
@@ -119,6 +120,7 @@ model Table {
 
   restaurant       Restaurant       @relation(fields: [restaurantId], references: [id])
   serviceRequests  ServiceRequest[] // NUEVO: relación inversa
+  services         Service[]         // NUEVO: relación inversa
 
   @@unique([number, restaurantId])
   @@index([restaurantId])
@@ -136,12 +138,28 @@ model ServiceRequest {
 
   table   Table    @relation(fields: [tableId], references: [id])
   restaurant Restaurant @relation(fields: [restaurantId], references: [id])
-  orders   Order[]
 
   @@index([tableId])
   @@index([restaurantId])
   @@index([status])
   @@map("service_requests")
+}
+
+model Service {
+  id           Int         @id @default(autoincrement())
+  tableId      Int         @map("table_id")
+  restaurantId Int         @map("restaurant_id")
+  status       ServiceStatus @default(ACTIVE) @map("status")
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  table   Table    @relation(fields: [tableId], references: [id])
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id])
+  orders   Order[]
+
+  @@index([tableId])
+  @@index([restaurantId])
+  @@index([status])
+  @@map("services")
 }
 
 model Order {
@@ -152,7 +170,7 @@ model Order {
   createdAt     DateTime    @default(now()) @map("created_at")
   authorizedAt  DateTime?   @map("authorized_at")
 
-  service   ServiceRequest @relation(fields: [serviceId], references: [id])
+  service   Service    @relation(fields: [serviceId], references: [id])
   orderItems OrderItem[]
 
   @@index([serviceId])
