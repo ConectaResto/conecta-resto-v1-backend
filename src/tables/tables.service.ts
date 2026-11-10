@@ -10,6 +10,7 @@ import { UpdateTableDto } from './dto/update-table.dto.js';
 import { handlePrismaUniqueConstraintError } from '../common/utils/handle-prisma-unique-constraint.js';
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface.js';
 import { UserRole } from '../../generated/prisma/enums.js';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class TablesService {
@@ -37,11 +38,14 @@ export class TablesService {
             );
         }
 
+        const qrToken = randomUUID();
+
         try {
             return await this.prisma.table.create({
                 data: {
                     number,
                     restaurantId,
+                    qrToken,
                 },
                 include: {
                     restaurant: true,
@@ -64,7 +68,13 @@ export class TablesService {
                     ? {}
                     : { restaurantId: user.restaurantId! }),
             },
-            include: {
+            select: {
+                id: true,
+                number: true,
+                isActive: true,
+                isAvailable: true,
+                restaurantId: true,
+                createdAt: true,
                 restaurant: true,
             },
             orderBy: {
@@ -86,7 +96,13 @@ export class TablesService {
                     restaurantId: user.restaurantId!,
                 }),
             },
-            include: {
+            select: {
+                id: true,
+                number: true,
+                isActive: true,
+                isAvailable: true,
+                restaurantId: true,
+                createdAt: true,
                 restaurant: true,
             },
         });

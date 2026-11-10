@@ -49,7 +49,15 @@ describe('TablesService', () => {
     expect(result).toEqual(mockTables);
     expect(prisma.table.findMany).toHaveBeenCalledWith({
       where: { isActive: true, restaurantId: 1 },
-      include: { restaurant: true },
+      select: {
+        id: true,
+        number: true,
+        isActive: true,
+        isAvailable: true,
+        restaurantId: true,
+        createdAt: true,
+        restaurant: true,
+      },
       orderBy: { number: 'asc' },
     });
   });
@@ -162,7 +170,7 @@ describe('TablesService', () => {
 
     expect(result).toEqual(mockTable);
     expect(prisma.table.create).toHaveBeenCalledWith({
-      data: { number: 5, restaurantId: 1 },
+      data: { number: 5, restaurantId: 1, qrToken: expect.any(String) },
       include: { restaurant: true },
     });
   });
@@ -197,7 +205,15 @@ describe('TablesService', () => {
 
     expect(prisma.table.findFirst).toHaveBeenCalledWith({
       where: { id: 2, isActive: true, restaurantId: 1 },
-      include: { restaurant: true },
+      select: {
+        id: true,
+        number: true,
+        isActive: true,
+        isAvailable: true,
+        restaurantId: true,
+        createdAt: true,
+        restaurant: true,
+      },
     });
   });
 
@@ -212,7 +228,15 @@ describe('TablesService', () => {
 
     expect(prisma.table.findFirst).toHaveBeenCalledWith({
       where: { id: 2, isActive: true, restaurantId: 1 },
-      include: { restaurant: true },
+      select: {
+        id: true,
+        number: true,
+        isActive: true,
+        isAvailable: true,
+        restaurantId: true,
+        createdAt: true,
+        restaurant: true,
+      },
     });
   });
 
@@ -230,7 +254,15 @@ describe('TablesService', () => {
     expect(result).toEqual(mockTables);
     expect(prisma.table.findMany).toHaveBeenCalledWith({
       where: { isActive: true },
-      include: { restaurant: true },
+      select: {
+        id: true,
+        number: true,
+        isActive: true,
+        isAvailable: true,
+        restaurantId: true,
+        createdAt: true,
+        restaurant: true,
+      },
       orderBy: { number: 'asc' },
     });
   });
@@ -252,7 +284,67 @@ describe('TablesService', () => {
     expect(result).toEqual(mockTable);
     expect(prisma.table.findFirst).toHaveBeenCalledWith({
       where: { id: 2, isActive: true },
-      include: { restaurant: true },
+      select: {
+        id: true,
+        number: true,
+        isActive: true,
+        isAvailable: true,
+        restaurantId: true,
+        createdAt: true,
+        restaurant: true,
+      },
+    });
+  });
+
+  it('findAll no expone qrToken en la respuesta', async () => {
+    const waiterUser = { sub: 2, role: UserRole.WAITER, restaurantId: 1 };
+    const mockTables = [
+      { id: 1, number: 1, isActive: true, isAvailable: true, restaurantId: 1 },
+    ];
+
+    prisma.table.findMany = vi.fn().mockResolvedValue(mockTables);
+
+    const result = await service.findAll(waiterUser);
+
+    expect(result[0]).not.toHaveProperty('qrToken');
+    const selectArg = (prisma.table.findMany as any).mock.calls[0][0].select;
+    expect(selectArg).not.toHaveProperty('qrToken');
+    expect(selectArg).toEqual({
+      id: true,
+      number: true,
+      isActive: true,
+      isAvailable: true,
+      restaurantId: true,
+      createdAt: true,
+      restaurant: true,
+    });
+  });
+
+  it('findOne no expone qrToken en la respuesta', async () => {
+    const waiterUser = { sub: 2, role: UserRole.WAITER, restaurantId: 1 };
+    const mockTable = {
+      id: 1,
+      number: 1,
+      isActive: true,
+      isAvailable: true,
+      restaurantId: 1,
+    };
+
+    prisma.table.findFirst = vi.fn().mockResolvedValue(mockTable);
+
+    const result = await service.findOne(1, waiterUser);
+
+    expect(result).not.toHaveProperty('qrToken');
+    const selectArg = (prisma.table.findFirst as any).mock.calls[0][0].select;
+    expect(selectArg).not.toHaveProperty('qrToken');
+    expect(selectArg).toEqual({
+      id: true,
+      number: true,
+      isActive: true,
+      isAvailable: true,
+      restaurantId: true,
+      createdAt: true,
+      restaurant: true,
     });
   });
 });
