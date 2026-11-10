@@ -129,12 +129,12 @@ export class ServiceRequestService {
                 throw new NotFoundException('Mesa asociada no encontrada');
             }
 
-            // 3. Volver a consultar el servicio dentro de la transacción
+    // 3. Volver a consultar el servicio dentro de la transacción
             const currentService = await prisma.serviceRequest.findUnique({
                 where: { id: serviceId },
             });
 
-            if (!currentService || currentService.status === 'CLOSED') {
+            if (!currentService || currentService.status === 'INACTIVE') {
                 throw new ForbiddenException('El servicio ya está cerrado o no existe');
             }
 
@@ -150,11 +150,11 @@ export class ServiceRequestService {
                 }
             }
 
-            // 5. Cerrar el servicio
+            // 6. Cerrar el servicio
             return prisma.serviceRequest.update({
                 where: { id: serviceId },
                 data: {
-                    status: 'CLOSED',
+                    status: 'INACTIVE',
                     closedAt: new Date(),
                 },
             });
