@@ -11,6 +11,7 @@ import { AuthModule } from './auth/auth.module.js';
 import { ServiceRequestModule } from './service-requests/service-request.module.js';
 import { OrdersModule } from './orders/orders.module.js';
 import { ServiceModule } from './service/service.module.js';
+import { MenuModule } from './menu/menu.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -29,6 +30,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     ServiceRequestModule,
     OrdersModule,
     ServiceModule,
+    MenuModule,
   ],
 })
 export class AppModule { }
