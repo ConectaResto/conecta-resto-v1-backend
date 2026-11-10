@@ -25,12 +25,12 @@ import type { AuthenticatedRequest } from '../auth/interfaces/authenticated-requ
 
 @Controller('tables')
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
 export class TablesController {
   constructor(private readonly tablesService: TablesService) { }
 
   // Create a table
   @Post()
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   create(
     @Body() createTableDto: CreateTableDto,
     @Req() request: AuthenticatedRequest,
@@ -43,12 +43,14 @@ export class TablesController {
 
   // Get all tables
   @Get()
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER)
   findAll(@Req() request: AuthenticatedRequest) {
     return this.tablesService.findAll(request.user);
   }
 
   // Get a table by ID
   @Get(':id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.WAITER, UserRole.CASHIER)
   findOne(
     @Param('id', ParseIntPipe) id: number,
     @Req() request: AuthenticatedRequest,
@@ -58,6 +60,7 @@ export class TablesController {
 
   // Update a table
   @Patch(':id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.WAITER)
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() updateTableDto: UpdateTableDto,
@@ -72,6 +75,7 @@ export class TablesController {
 
   // Delete a table
   @Delete(':id')
+  @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(
     @Param('id', ParseIntPipe) id: number,
