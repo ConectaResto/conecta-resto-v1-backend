@@ -3,7 +3,6 @@ import { INestApplication } from '@nestjs/common';
 import { AppModule } from './../src/app.module.js';
 import { PrismaService } from './../src/prisma/prisma.service.js';
 import { ServiceRequestService } from './../src/service-requests/service-request.service.js';
-import { ServiceStatus } from './../generated/prisma/enums.js';
 
 describe('ServiceRequest concurrency (integration)', () => {
   let app: INestApplication;
@@ -56,12 +55,12 @@ describe('ServiceRequest concurrency (integration)', () => {
 
       // Ambas obtienen el mismo servicio
       expect(result1.id).toEqual(result2.id);
-      expect(result1.status).toEqual(ServiceStatus.ACTIVE);
-      expect(result2.status).toEqual(ServiceStatus.ACTIVE);
+      expect(result1.status).toEqual('ACTIVE');
+      expect(result2.status).toEqual('ACTIVE');
 
       // Solo existe un servicio ACTIVE para esa mesa
       const activeCount = await prisma.serviceRequest.count({
-        where: { tableId: table.id, status: ServiceStatus.ACTIVE },
+        where: { tableId: table.id, status: 'ACTIVE' },
       });
       expect(activeCount).toEqual(1);
     } finally {
