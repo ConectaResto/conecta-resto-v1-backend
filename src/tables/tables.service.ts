@@ -3,7 +3,6 @@ import {
     ForbiddenException,
     NotFoundException,
 } from '@nestjs/common';
-
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CreateTableDto } from './dto/create-table.dto.js';
 import { UpdateTableDto } from './dto/update-table.dto.js';
@@ -11,6 +10,7 @@ import { handlePrismaUniqueConstraintError } from '../common/utils/handle-prisma
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface.js';
 import { UserRole } from '../../generated/prisma/enums.js';
 import { randomUUID } from 'crypto';
+import { toBuffer } from 'qrcode';
 
 @Injectable()
 export class TablesService {
@@ -167,5 +167,28 @@ export class TablesService {
             where: { id },
             data: { isActive: false },
         });
+    }
+
+    // Generate QR code for a table
+    async getQRCode(
+        id: number,
+        user: AuthenticatedRequest['user'],
+    ) {
+        const table = await this.findOne(id, user);
+
+        const frontendBaseUrl = process.env.FRONTEND_BASE_URL || 'http://localhost:3000';
+        const qrUrl = `${frontendBaseUrl}/menu/restaurant/${table.restaurantId}/table/${table.id}`;
+
+        const qrCodeBuffer = await toBuffer(qrUrl, {
+            type: 'png',
+            width: 300,
+            margin: 2,
+            color: {
+                dark: '#000000',
+                light: '#FFFFFF',
+            },
+        });
+
+        return qrCodeBuffer;
     }
 }
