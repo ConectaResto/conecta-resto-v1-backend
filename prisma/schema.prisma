@@ -12,6 +12,7 @@ enum UserRole {
   CASHIER
   ADMIN
   SUPER_ADMIN
+  KITCHEN
 
   @@map("user_roles")
 }
@@ -28,6 +29,14 @@ enum OrderStatus {
   AUTHORIZED
 
   @@map("order_status")
+}
+
+enum KitchenOrderStatus {
+  RECEIVED
+  PREPARING
+  READY
+
+  @@map("kitchen_order_status")
 }
 
 model Restaurant {
@@ -172,6 +181,7 @@ model Order {
 
   service   Service    @relation(fields: [serviceId], references: [id])
   orderItems OrderItem[]
+  kitchenOrder KitchenOrder?
 
   @@index([serviceId])
   @@index([restaurantId])
@@ -192,4 +202,17 @@ model OrderItem {
   @@index([orderId])
   @@index([productId])
   @@map("order_items")
+}
+
+model KitchenOrder {
+  id        Int      @id @default(autoincrement())
+  orderId   Int      @unique @map("order_id")
+  status    KitchenOrderStatus @default(RECEIVED) @map("status")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  order Order @relation(fields: [orderId], references: [id])
+
+  @@index([status])
+  @@map("kitchen_orders")
 }

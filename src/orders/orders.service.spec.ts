@@ -32,6 +32,9 @@ describe('OrdersService', () => {
         findUnique: vi.fn(),
         update: vi.fn(),
       },
+      kitchenOrder: {
+        create: vi.fn(),
+      },
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -313,11 +316,22 @@ describe('OrdersService', () => {
 
     vi.mocked(mockPrisma.order.findUnique).mockResolvedValue(mockOrder);
     vi.mocked(mockPrisma.order.update).mockResolvedValue(mockAuthorizedOrder);
+    vi.mocked(mockPrisma.kitchenOrder.create).mockResolvedValue({
+      id: 1,
+      orderId: 1,
+      status: 'RECEIVED',
+    });
 
     const result = await service.authorize(1, waiterUser);
 
     expect(result.status).toEqual('AUTHORIZED');
     expect(result.authorizedAt).toBeDefined();
+    expect(mockPrisma.kitchenOrder.create).toHaveBeenCalledWith({
+      data: {
+        orderId: 1,
+        status: 'RECEIVED',
+      },
+    });
     expect(mockPrisma.order.update).toHaveBeenCalledWith({
       where: { id: 1, status: 'PENDING' },
       data: {
@@ -377,5 +391,86 @@ describe('OrdersService', () => {
     await expect(
       service.authorize(1, waiterUser),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('Autorizar orden ya AUTORIZADA → no se crea KitchenOrder', async () => {
+    vi.mocked(mockPrisma.order.findUnique).mockResolvedValue({
+      id: 1,
+      serviceId: 1,
+      restaurantId: 1,
+      status: 'AUTHORIZED',
+      createdAt: new Date(),
+      authorizedAt: new Date(),
+    });
+
+    await expect(
+      service.authorize(1, waiterUser),
+    ).rejects.toThrow(ForbiddenException);
+
+    expect(mockPrisma.kitchenOrder.create).not.toHaveBeenCalled();
+  });
+
+  it('WAITER autoriza pedido de otro restaurante → no se crea KitchenOrder', async () => {
+    vi.mocked(mockPrisma.order.findUnique).mockResolvedValue({
+      id: 1,
+      serviceId: 1,
+      restaurantId: 2,
+      status: 'PENDING',
+      createdAt: new Date(),
+      authorizedAt: null,
+    });
+
+    await expect(
+      service.authorize(1, waiterUser),
+    ).rejects.toThrow(ForbiddenException);
+
+    expect(mockPrisma.kitchenOrder.create).not.toHaveBeenCalled();
+  });
+
+  it('kitchenOrder.create() falla → error propaga y order.update() sí se ejecutó', async () => {
+    const mockOrder = {
+      id: 1,
+      serviceId: 1,
+      restaurantId: 1,
+      status: 'PENDING',
+      createdAt: new Date(),
+      authorizedAt: null,
+    };
+    const dbError = new Error('Falla al crear KitchenOrder');
+
+    vi.mocked(mockPrisma.order.findUnique).mockResolvedValue(mockOrder);
+    vi.mocked(mockPrisma.order.update).mockResolvedValue({
+      ...mockOrder,
+      status: 'AUTHORIZED',
+      authorizedAt: new Date(),
+      orderItems: [],
+    });
+    vi.mocked(mockPrisma.kitchenOrder.create).mockRejectedValue(dbError);
+
+    await expect(
+      service.authorize(1, waiterUser),
+    ).rejects.toThrow(dbError);
+
+    expect(mockPrisma.order.update).toHaveBeenCalledWith({
+      where: { id: 1, status: 'PENDING' },
+      data: {
+        status: 'AUTHORIZED',
+        authorizedAt: expect.any(Date),
+      },
+      include: {
+        orderItems: {
+          include: {
+            product: true,
+          },
+        },
+      },
+    });
+
+    expect(mockPrisma.kitchenOrder.create).toHaveBeenCalledWith({
+      data: {
+        orderId: 1,
+        status: 'RECEIVED',
+      },
+    });
   });
 });

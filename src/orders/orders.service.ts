@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface.js';
 import { UserRole } from '../../generated/prisma/enums.js';
 import { OrderStatus } from '../../generated/prisma/enums.js';
+import { KitchenOrderStatus } from '../../generated/prisma/enums.js';
 import { OrderItemDto } from './dto/order-item.dto.js';
 
 @Injectable()
@@ -173,7 +174,7 @@ export class OrdersService {
 
             // 4. Autorizar la orden de forma atómica: solo actualizar si sigue PENDING
             try {
-                return await prisma.order.update({
+                const authorizedOrder = await prisma.order.update({
                     where: {
                         id: orderId,
                         status: 'PENDING',
@@ -190,6 +191,16 @@ export class OrdersService {
                         },
                     },
                 });
+
+                // 5. Crear registro de cocina automáticamente
+                await prisma.kitchenOrder.create({
+                    data: {
+                        orderId: order.id,
+                        status: KitchenOrderStatus.RECEIVED,
+                    },
+                });
+
+                return authorizedOrder;
             } catch (error) {
                 const prismaError = error as { code?: string };
                 if (prismaError.code === 'P2025') {

@@ -14,6 +14,7 @@ Este documento establece el diseño funcional aprobado de permisos y autorizacio
 | ADMIN | Rol del sistema | JWT (autenticado) | Su propio restaurante |
 | WAITER | Rol del sistema | JWT (autenticado) | Su propio restaurante |
 | CASHIER | Rol del sistema | JWT (autenticado) | Su propio restaurante |
+| KITCHEN | Rol del sistema | JWT (autenticado) | Su propio restaurante |
 | CLIENT | Actor público | **Sin autenticación** | Público: acceso al menú vía QR |
 
 **Nota:** El CLIENT no es un rol del sistema. No requiere JWT ni autenticación. El endpoint `POST /auth/login` es público, pero eso no significa que CLIENT tenga un permiso de autenticación: el cliente no inicia sesión ni posee credenciales en el sistema.
@@ -50,7 +51,7 @@ Este documento establece el diseño funcional aprobado de permisos y autorizacio
 - ❌ **No aplica**: El rol no tiene este permiso
 
 ### Notas sobre los estados de lectura
-- **Lectura autenticada**: requiere JWT y pertenece a un rol del sistema (SUPER_ADMIN, ADMIN, WAITER, CASHIER).
+- **Lectura autenticada**: requiere JWT y pertenece a un rol del sistema (SUPER_ADMIN, ADMIN, WAITER, CASHIER, KITCHEN).
 - **Lectura pública**: accesible sin autenticación (solo CLIENT, a través del menú público).
 - No se mezclan ambos estados en una misma celda.
 
@@ -94,6 +95,9 @@ Este documento establece el diseño funcional aprobado de permisos y autorizacio
 | Order | Leer (autenticada) | ✅ | ✅ (propio) | ✅ (propio) | ❌ (D11) | ❌ | 🔜 Futuro |
 | Order | Leer (pública) | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ No aplica |
 | Order | Autorizar (`PENDING` → `AUTHORIZED`) | ✅ | ✅ (propio) | ✅ (propio) | ❌ | ❌ | 🔜 Futuro |
+| KitchenOrder | Crear (al autorizar un Order) | ❌ | ❌ | ❌ | ❌ | ❌ | 🔜 Futuro (SCRUM-23) |
+| KitchenOrder | Leer (autenticada) | ✅ | ✅ (propio) | ✅ (propio) | ❌ | ❌ | 🔜 Futuro (SCRUM-23) |
+| KitchenOrder | Actualizar estado | ✅ (lectura global) | ❌ | ❌ | ❌ | ❌ | 🔜 Futuro (SCRUM-23) |
 
 *\* Nota sobre `Restaurant > Actualizar`: el endpoint existe y está protegido por `@Roles(SUPER_ADMIN, ADMIN)`, pero la restricción D4 (ADMIN no puede modificar `isActive` de su propio restaurante) **no está implementada** en `RestaurantsService.update`. El DTO `UpdateRestaurantDto` permite enviar el campo `isActive`, pero el DTO por sí solo no garantiza protección. Esta regla está aprobada pero su implementación está pendiente.*
 
@@ -246,6 +250,7 @@ Este documento establece el diseño funcional aprobado de permisos y autorizacio
 - Los permisos de CASHIER sobre Orders quedan pendientes de diseño del módulo de caja y no bloquean el cierre de SCRUM-7 (D8, D11).
 - La desactivación lógica de mesas (soft delete con `isActive`) corresponde al alcance de **SCRUM-6**.
 - La lectura de Services y Orders para CASHIER queda pendiente de definir (D11) y no se asume ningún permiso por defecto.
+- El rol `KITCHEN` solo tiene acceso al módulo Kitchen (`/kitchen/orders`), limitado a su propio restaurante mediante `restaurantId`. `SUPER_ADMIN` conserva alcance global de lectura. `WAITER`, `ADMIN` y `CASHIER` no tienen acceso al módulo Kitchen.
 
 ---
 
