@@ -55,7 +55,7 @@ export class RestaurantsService {
     ) {
         await this.findOne(id, user);
 
-        if (user.role === UserRole.ADMIN && 'isActive' in updateRestaurantDto) {
+        if (user.role === UserRole.ADMIN && updateRestaurantDto.isActive !== undefined) {
             throw new ForbiddenException(
                 'ADMIN cannot modify restaurant isActive status',
             );
