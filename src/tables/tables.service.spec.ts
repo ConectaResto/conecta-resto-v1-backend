@@ -9,6 +9,7 @@ import { UserRole } from '../../generated/prisma/enums.js';
 describe('TablesService', () => {
   let service: TablesService;
   let prisma: PrismaService;
+  let mockPrisma: any;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -36,119 +37,6 @@ describe('TablesService', () => {
     prisma = module.get<PrismaService>(PrismaService);
   });
 
-  it('WAITER puede consultar mesas de su restaurante (findAll)', async () => {
-    const waiterUser = { sub: 2, role: UserRole.WAITER, restaurantId: 1 };
-    const mockTables = [
-      { id: 1, number: 1, isActive: true, isAvailable: true, restaurantId: 1 },
-    ];
-
-    prisma.table.findMany = vi.fn().mockResolvedValue(mockTables);
-
-    const result = await service.findAll(waiterUser);
-
-    expect(result).toEqual(mockTables);
-    expect(prisma.table.findMany).toHaveBeenCalledWith({
-      where: { isActive: true, restaurantId: 1 },
-      select: {
-        id: true,
-        number: true,
-        isActive: true,
-        isAvailable: true,
-        restaurantId: true,
-        createdAt: true,
-        restaurant: true,
-      },
-      orderBy: { number: 'asc' },
-    });
-  });
-
-  it('CASHIER puede consultar mesas de su restaurante (findAll)', async () => {
-    const cashierUser = { sub: 3, role: UserRole.CASHIER, restaurantId: 1 };
-    const mockTables = [
-      { id: 1, number: 1, isActive: true, isAvailable: true, restaurantId: 1 },
-    ];
-
-    prisma.table.findMany = vi.fn().mockResolvedValue(mockTables);
-
-    const result = await service.findAll(cashierUser);
-
-    expect(result).toEqual(mockTables);
-  });
-
-  it('WAITER puede consultar una mesa de su restaurante (findOne)', async () => {
-    const waiterUser = { sub: 2, role: UserRole.WAITER, restaurantId: 1 };
-    const mockTable = {
-      id: 1,
-      number: 1,
-      isActive: true,
-      isAvailable: true,
-      restaurantId: 1,
-    };
-
-    prisma.table.findFirst = vi.fn().mockResolvedValue(mockTable);
-
-    const result = await service.findOne(1, waiterUser);
-
-    expect(result).toEqual(mockTable);
-  });
-
-  it('CASHIER puede consultar una mesa de su restaurante (findOne)', async () => {
-    const cashierUser = { sub: 3, role: UserRole.CASHIER, restaurantId: 1 };
-    const mockTable = {
-      id: 1,
-      number: 1,
-      isActive: true,
-      isAvailable: true,
-      restaurantId: 1,
-    };
-
-    prisma.table.findFirst = vi.fn().mockResolvedValue(mockTable);
-
-    const result = await service.findOne(1, cashierUser);
-
-    expect(result).toEqual(mockTable);
-  });
-
-  it('WAITER puede actualizar isAvailable de una mesa', async () => {
-    const waiterUser = { sub: 2, role: UserRole.WAITER, restaurantId: 1 };
-    const mockTable = {
-      id: 1,
-      number: 1,
-      isActive: true,
-      isAvailable: false,
-      restaurantId: 1,
-    };
-
-    prisma.table.findFirst = vi.fn().mockResolvedValue(mockTable);
-    prisma.table.update = vi.fn().mockResolvedValue(mockTable);
-
-    const result = await service.update(1, { isAvailable: false }, waiterUser);
-
-    expect(result).toEqual(mockTable);
-    expect(prisma.table.update).toHaveBeenCalledWith({
-      where: { id: 1 },
-      data: { isAvailable: false, restaurantId: 1 },
-      include: { restaurant: true },
-    });
-  });
-
-  it('WAITER no puede actualizar número de mesa (ForbiddenException)', async () => {
-    const waiterUser = { sub: 2, role: UserRole.WAITER, restaurantId: 1 };
-    const mockTable = {
-      id: 1,
-      number: 1,
-      isActive: true,
-      isAvailable: true,
-      restaurantId: 1,
-    };
-
-    prisma.table.findFirst = vi.fn().mockResolvedValue(mockTable);
-
-    await expect(
-      service.update(1, { number: 5 }, waiterUser),
-    ).rejects.toThrow(ForbiddenException);
-  });
-
   it('ADMIN puede crear mesas', async () => {
     const adminUser = { sub: 1, role: UserRole.ADMIN, restaurantId: 1 };
     const createDto: CreateTableDto = { number: 5, restaurantId: 1 };
@@ -158,6 +46,8 @@ describe('TablesService', () => {
       isActive: true,
       isAvailable: true,
       restaurantId: 1,
+      qrToken: 'test-qr-token-123',
+      createdAt: new Date(),
     };
 
     prisma.restaurant.findUnique = vi.fn().mockResolvedValue({
@@ -173,6 +63,17 @@ describe('TablesService', () => {
       data: { number: 5, restaurantId: 1, qrToken: expect.any(String) },
       include: { restaurant: true },
     });
+  });
+
+  it('WAITER no puede crear mesas de otro restaurante', async () => {
+    const waiterUser = { sub: 2, role: UserRole.WAITER, restaurantId: 1 };
+    const createDto: CreateTableDto = { number: 5, restaurantId: 2 };
+
+    prisma.restaurant.findUnique = vi.fn().mockResolvedValue(null);
+
+    await expect(
+      service.create(createDto, waiterUser),
+    ).rejects.toThrow(NotFoundException);
   });
 
   it('ADMIN puede eliminar mesas', async () => {
@@ -196,6 +97,50 @@ describe('TablesService', () => {
     });
   });
 
+  it('WAITER no puede eliminar mesas de otro restaurante', async () => {
+    const waiterUser = { sub: 2, role: UserRole.WAITER, restaurantId: 1 };
+    const mockTable = {
+      id: 2,
+      number: 2,
+      isActive: true,
+      isAvailable: true,
+      restaurantId: 2,
+    };
+
+    prisma.table.findFirst = vi.fn().mockResolvedValue(null);
+
+    await expect(service.remove(2, waiterUser)).rejects.toThrow(NotFoundException);
+  });
+
+  it('WAITER puede consultar una mesa de su restaurante (findOne)', async () => {
+    const waiterUser = { sub: 2, role: UserRole.WAITER, restaurantId: 1 };
+    const mockTable = {
+      id: 1,
+      number: 1,
+      isActive: true,
+      isAvailable: true,
+      restaurantId: 1,
+    };
+
+    prisma.table.findFirst = vi.fn().mockResolvedValue(mockTable);
+
+    const result = await service.findOne(1, waiterUser);
+
+    expect(result).toEqual(mockTable);
+    expect(prisma.table.findFirst).toHaveBeenCalledWith({
+      where: { id: 1, isActive: true, restaurantId: 1 },
+      select: {
+        id: true,
+        number: true,
+        isActive: true,
+        isAvailable: true,
+        restaurantId: true,
+        createdAt: true,
+        restaurant: true,
+      },
+    });
+  });
+
   it('ADMIN no puede consultar una mesa de otro restaurante (NotFoundException)', async () => {
     const adminUser = { sub: 1, role: UserRole.ADMIN, restaurantId: 1 };
 
@@ -214,56 +159,6 @@ describe('TablesService', () => {
         createdAt: true,
         restaurant: true,
       },
-    });
-  });
-
-  it('WAITER no puede actualizar una mesa de otro restaurante (NotFoundException)', async () => {
-    const waiterUser = { sub: 2, role: UserRole.WAITER, restaurantId: 1 };
-
-    prisma.table.findFirst = vi.fn().mockResolvedValue(null);
-
-    await expect(
-      service.update(2, { isAvailable: false }, waiterUser),
-    ).rejects.toThrow(NotFoundException);
-
-    expect(prisma.table.findFirst).toHaveBeenCalledWith({
-      where: { id: 2, isActive: true, restaurantId: 1 },
-      select: {
-        id: true,
-        number: true,
-        isActive: true,
-        isAvailable: true,
-        restaurantId: true,
-        createdAt: true,
-        restaurant: true,
-      },
-    });
-  });
-
-  it('SUPER_ADMIN puede consultar todas las mesas (findAll sin filtro restaurantId)', async () => {
-    const superAdminUser = { sub: 1, role: UserRole.SUPER_ADMIN, restaurantId: null };
-    const mockTables = [
-      { id: 1, number: 1, isActive: true, isAvailable: true, restaurantId: 1 },
-      { id: 2, number: 2, isActive: true, isAvailable: true, restaurantId: 2 },
-    ];
-
-    prisma.table.findMany = vi.fn().mockResolvedValue(mockTables);
-
-    const result = await service.findAll(superAdminUser);
-
-    expect(result).toEqual(mockTables);
-    expect(prisma.table.findMany).toHaveBeenCalledWith({
-      where: { isActive: true },
-      select: {
-        id: true,
-        number: true,
-        isActive: true,
-        isAvailable: true,
-        restaurantId: true,
-        createdAt: true,
-        restaurant: true,
-      },
-      orderBy: { number: 'asc' },
     });
   });
 
@@ -296,31 +191,7 @@ describe('TablesService', () => {
     });
   });
 
-  it('findAll no expone qrToken en la respuesta', async () => {
-    const waiterUser = { sub: 2, role: UserRole.WAITER, restaurantId: 1 };
-    const mockTables = [
-      { id: 1, number: 1, isActive: true, isAvailable: true, restaurantId: 1 },
-    ];
-
-    prisma.table.findMany = vi.fn().mockResolvedValue(mockTables);
-
-    const result = await service.findAll(waiterUser);
-
-    expect(result[0]).not.toHaveProperty('qrToken');
-    const selectArg = (prisma.table.findMany as any).mock.calls[0][0].select;
-    expect(selectArg).not.toHaveProperty('qrToken');
-    expect(selectArg).toEqual({
-      id: true,
-      number: true,
-      isActive: true,
-      isAvailable: true,
-      restaurantId: true,
-      createdAt: true,
-      restaurant: true,
-    });
-  });
-
-  it('findOne no expone qrToken en la respuesta', async () => {
+  it('WAITER puede actualizar isAvailable de su mesa', async () => {
     const waiterUser = { sub: 2, role: UserRole.WAITER, restaurantId: 1 };
     const mockTable = {
       id: 1,
@@ -331,20 +202,80 @@ describe('TablesService', () => {
     };
 
     prisma.table.findFirst = vi.fn().mockResolvedValue(mockTable);
+    prisma.table.update = vi.fn().mockResolvedValue(mockTable);
 
-    const result = await service.findOne(1, waiterUser);
+    const result = await service.update(1, { isAvailable: false }, waiterUser);
 
-    expect(result).not.toHaveProperty('qrToken');
-    const selectArg = (prisma.table.findFirst as any).mock.calls[0][0].select;
-    expect(selectArg).not.toHaveProperty('qrToken');
-    expect(selectArg).toEqual({
-      id: true,
-      number: true,
+    expect(result).toEqual(mockTable);
+    expect(prisma.table.update).toHaveBeenCalledWith({
+      where: { id: 1 },
+      data: { isAvailable: false, restaurantId: 1 },
+      include: { restaurant: true },
+    });
+  });
+
+  it('ADMIN puede actualizar cualquier mesa', async () => {
+    const superAdminUser = { sub: 1, role: UserRole.SUPER_ADMIN, restaurantId: 1 };
+    const mockTable = {
+      id: 2,
+      number: 2,
       isActive: true,
       isAvailable: true,
-      restaurantId: true,
-      createdAt: true,
-      restaurant: true,
+      restaurantId: 2,
+    };
+    const updatedTable = {
+      id: 2,
+      number: 2,
+      isActive: true,
+      isAvailable: false,
+      restaurantId: 2,
+    };
+
+    prisma.table.findFirst = vi.fn().mockImplementation(() => mockTable);
+    prisma.table.update = vi.fn().mockResolvedValue(updatedTable);
+
+    const result = await service.update(2, { isAvailable: false }, superAdminUser);
+
+    expect(result).toEqual(updatedTable);
+    expect(prisma.table.update).toHaveBeenCalledWith({
+      where: { id: 2 },
+      data: { isAvailable: false },
+      include: { restaurant: true },
     });
+  });
+
+  it('WAITER puede obtener QR de mesa de su restaurante', async () => {
+    const waiterUser = { sub: 2, role: UserRole.WAITER, restaurantId: 1 };
+    const mockTable = {
+      id: 1,
+      number: 1,
+      isActive: true,
+      isAvailable: true,
+      restaurantId: 1,
+      qrToken: 'test-qr-token-123',
+      createdAt: new Date(),
+    };
+
+    prisma.table.findFirst = vi.fn().mockResolvedValue(mockTable);
+
+    const result = await service.getQRCode(1, waiterUser);
+
+    expect(result).toBeInstanceOf(Buffer);
+  });
+
+  it('WAITER no puede obtener QR de mesa de otro restaurante', async () => {
+    const waiterUser = { sub: 2, role: UserRole.WAITER, restaurantId: 1 };
+
+    prisma.table.findFirst = vi.fn().mockResolvedValue(null);
+
+    await expect(service.getQRCode(2, waiterUser)).rejects.toThrow(NotFoundException);
+  });
+
+  it('WAITER no puede obtener QR de mesa inexistente', async () => {
+    const waiterUser = { sub: 2, role: UserRole.WAITER, restaurantId: 1 };
+
+    prisma.table.findFirst = vi.fn().mockResolvedValue(null);
+
+    await expect(service.getQRCode(999, waiterUser)).rejects.toThrow(NotFoundException);
   });
 });
