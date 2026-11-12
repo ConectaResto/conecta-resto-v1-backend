@@ -1342,6 +1342,7 @@ describe('Orders (e2e)', () => {
 
   afterAll(async () => {
     if (orderId) {
+      await prisma.kitchenOrder.delete({ where: { orderId } });
       await prisma.orderItem.deleteMany({ where: { orderId } });
       await prisma.order.delete({ where: { id: orderId } });
     }
@@ -1487,11 +1488,470 @@ describe('Orders (e2e)', () => {
         .set('Authorization', `Bearer ${adminToken}`)
         .expect(200);
       expect(Array.isArray(res.body)).toBe(true);
-      // Todos los pedidos devueltos deben pertenecer al restaurante del ADMIN
       res.body.forEach((o: any) => {
         expect(o.restaurantId).toBe(restaurantId);
         expect(o.status).toBe('PENDING');
-      });
+  });
+});
+});
+
+describe('Kitchen (e2e)', () => {
+  let app: INestApplication<App>;
+  let prisma: PrismaService;
+  let superAdminToken: string;
+  let adminToken: string;
+  let kitchenToken: string;
+  let waiterToken: string;
+  let cashierToken: string;
+  let orderId: number;
+  let kitchenOrderId: number;
+  let restaurantId: number;
+  let otherRestaurantId: number;
+  let tableId: number;
+  let productId: number;
+  let serviceId: number;
+  const qrToken = 'e2e-kitchen-qr-token-001';
+
+  const superAdminUser = {
+    email: 'e2e-superadmin-kitchen@test.com',
+    password: 'TestPassword123',
+    name: 'E2E SuperAdmin Kitchen',
+    role: UserRole.SUPER_ADMIN,
+  };
+
+  const adminUser = {
+    email: 'e2e-admin-kitchen@test.com',
+    password: 'TestPassword123',
+    name: 'E2E Admin Kitchen',
+    role: UserRole.ADMIN,
+  };
+
+  const kitchenUser = {
+    email: 'e2e-kitchen-kitchen@test.com',
+    password: 'TestPassword123',
+    name: 'E2E Kitchen User',
+    role: UserRole.KITCHEN,
+  };
+
+  const waiterUser = {
+    email: 'e2e-waiter-kitchen@test.com',
+    password: 'TestPassword123',
+    name: 'E2E Waiter Kitchen',
+    role: UserRole.WAITER,
+  };
+
+  const createRestaurantDto = {
+    name: 'E2E Test Restaurant Kitchen',
+    address: 'Calle Kitchen 123',
+    phone: '3001234567',
+    email: 'e2e-restaurant-kitchen@test.com',
+  };
+
+  const createTableDto = {
+    number: 77,
+  };
+
+  const createProductDto = {
+    name: 'E2E Product Kitchen',
+    description: 'Producto prueba E2E cocina',
+    price: 10000,
+  };
+
+  beforeAll(async () => {
+    const moduleFixture: TestingModule = await Test.createTestingModule({
+      imports: [AppModule],
+    }).compile();
+
+    app = moduleFixture.createNestApplication();
+    prisma = moduleFixture.get<PrismaService>(PrismaService);
+    await app.init();
+
+    // Crear SUPER_ADMIN
+    const superAdminHash = await bcrypt.hash(superAdminUser.password, 10);
+    await prisma.user.create({
+      data: {
+        email: superAdminUser.email,
+        passwordHash: superAdminHash,
+        name: superAdminUser.name,
+        role: superAdminUser.role,
+        isActive: true,
+      },
+    });
+
+    // Login SUPER_ADMIN
+    const superAdminLogin = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: superAdminUser.email, password: superAdminUser.password });
+    superAdminToken = superAdminLogin.body.accessToken;
+
+    // Crear restaurante como SUPER_ADMIN
+    const createRes = await request(app.getHttpServer())
+      .post('/restaurants')
+      .set('Authorization', `Bearer ${superAdminToken}`)
+      .send(createRestaurantDto)
+      .expect(201);
+    restaurantId = createRes.body.id;
+
+    // Crear ADMIN con restaurantId del restaurante creado
+    const adminHash = await bcrypt.hash(adminUser.password, 10);
+    await prisma.user.create({
+      data: {
+        email: adminUser.email,
+        passwordHash: adminHash,
+        name: adminUser.name,
+        role: adminUser.role,
+        restaurantId,
+        isActive: true,
+      },
+    });
+
+    // Login ADMIN
+    const adminLogin = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: adminUser.email, password: adminUser.password });
+    adminToken = adminLogin.body.accessToken;
+
+    // Crear KITCHEN con restaurantId del restaurante creado
+    const kitchenHash = await bcrypt.hash(kitchenUser.password, 10);
+    await prisma.user.create({
+      data: {
+        email: kitchenUser.email,
+        passwordHash: kitchenHash,
+        name: kitchenUser.name,
+        role: kitchenUser.role,
+        restaurantId,
+        isActive: true,
+      },
+    });
+
+    // Login KITCHEN
+    const kitchenLogin = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: kitchenUser.email, password: kitchenUser.password });
+    kitchenToken = kitchenLogin.body.accessToken;
+
+    // Crear WAITER con restaurantId del restaurante creado
+    const waiterHash = await bcrypt.hash(waiterUser.password, 10);
+    await prisma.user.create({
+      data: {
+        email: waiterUser.email,
+        passwordHash: waiterHash,
+        name: waiterUser.name,
+        role: waiterUser.role,
+        restaurantId,
+        isActive: true,
+      },
+    });
+
+    // Login WAITER
+    const waiterLogin = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: waiterUser.email, password: waiterUser.password });
+    waiterToken = waiterLogin.body.accessToken;
+
+    // Crear producto en este restaurante (vía Prisma, fixture de prueba)
+    const product = await prisma.product.create({
+      data: {
+        name: createProductDto.name,
+        description: createProductDto.description,
+        price: createProductDto.price,
+        restaurantId,
+      },
+    });
+
+    productId = product.id;
+
+    // Crear mesa activa con qrToken conocido
+    const table = await prisma.table.create({
+      data: {
+        ...createTableDto,
+        restaurantId,
+        isActive: true,
+        isAvailable: true,
+        qrToken,
+      },
+    });
+    tableId = table.id;
+  });
+
+  afterAll(async () => {
+    // Limpiar todas las órdenes del restaurante (incluyendo huérfanas de pruebas fallidas)
+    const restaurantOrders = await prisma.order.findMany({
+      where: { restaurantId },
+      select: { id: true },
+    });
+    for (const o of restaurantOrders) {
+      await prisma.kitchenOrder.delete({ where: { orderId: o.id } }).catch(() => {});
+      await prisma.orderItem.deleteMany({ where: { orderId: o.id } });
+      await prisma.order.delete({ where: { id: o.id } }).catch(() => {});
+    }
+    await prisma.service.deleteMany({ where: { tableId } });
+    await prisma.table.delete({ where: { id: tableId } });
+    await prisma.product.delete({ where: { id: productId } });
+    await prisma.restaurant.delete({ where: { id: restaurantId } });
+    await prisma.user.delete({ where: { email: waiterUser.email } });
+    await prisma.user.delete({ where: { email: kitchenUser.email } });
+    await prisma.user.delete({ where: { email: adminUser.email } });
+    await prisma.user.delete({ where: { email: superAdminUser.email } });
+    await app.close();
+  });
+
+  describe('POST /orders/from-qr + autorización', () => {
+    it('debe crear pedido desde QR y autorizarlo, generando KitchenOrder RECEIVED', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/orders/from-qr')
+        .send({
+          qrToken,
+          items: [{ productId, quantity: 2 }],
+        })
+        .expect(201);
+      orderId = res.body.id;
+      serviceId = res.body.serviceId;
+      expect(res.body.status).toBe('PENDING');
+
+      const authRes = await request(app.getHttpServer())
+        .patch(`/orders/${orderId}/authorize`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+      expect(authRes.body.status).toBe('AUTHORIZED');
+
+      const kitchenRes = await request(app.getHttpServer())
+        .get(`/kitchen/orders/${orderId}`)
+        .set('Authorization', `Bearer ${kitchenToken}`)
+        .expect(200);
+      kitchenOrderId = kitchenRes.body.id;
+      expect(kitchenRes.body.status).toBe('RECEIVED');
+      expect(kitchenRes.body.orderId).toBe(orderId);
     });
   });
+
+  describe('PATCH /kitchen/orders/:id/status', () => {
+    it('KITCHEN puede cambiar de RECEIVED a PREPARING', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/kitchen/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${kitchenToken}`)
+        .send({ status: 'PREPARING' })
+        .expect(200);
+      expect(res.body.status).toBe('PREPARING');
+    });
+
+    it('KITCHEN puede cambiar de PREPARING a READY', async () => {
+      const res = await request(app.getHttpServer())
+        .patch(`/kitchen/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${kitchenToken}`)
+        .send({ status: 'READY' })
+        .expect(200);
+      expect(res.body.status).toBe('READY');
+    });
+
+    it('KITCHEN no puede cambiar de RECEIVED a READY (transición inválida)', async () => {
+      // Crear un nuevo pedido para probar transición inválida
+      const res = await request(app.getHttpServer())
+        .post('/orders/from-qr')
+        .send({
+          qrToken,
+          items: [{ productId, quantity: 1 }],
+        })
+        .expect(201);
+      const testOrderId = res.body.id;
+
+      await request(app.getHttpServer())
+        .patch(`/orders/${testOrderId}/authorize`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      const kitchenRes = await request(app.getHttpServer())
+        .get(`/kitchen/orders/${testOrderId}`)
+        .set('Authorization', `Bearer ${kitchenToken}`)
+        .expect(200);
+      const testKitchenOrderId = kitchenRes.body.id;
+
+      await request(app.getHttpServer())
+        .patch(`/kitchen/orders/${testOrderId}/status`)
+        .set('Authorization', `Bearer ${kitchenToken}`)
+        .send({ status: 'READY' })
+        .expect(403);
+
+      // Limpiar
+      await prisma.kitchenOrder.delete({ where: { id: testKitchenOrderId } });
+      await prisma.orderItem.deleteMany({ where: { orderId: testOrderId } });
+      await prisma.order.delete({ where: { id: testOrderId } });
+    });
+
+    it('SUPER_ADMIN no puede cambiar estado de cocina (403)', async () => {
+      // Crear un nuevo pedido para probar SUPER_ADMIN sin permiso de escritura
+      const res = await request(app.getHttpServer())
+        .post('/orders/from-qr')
+        .send({
+          qrToken,
+          items: [{ productId, quantity: 1 }],
+        })
+        .expect(201);
+      const testOrderId = res.body.id;
+
+      await request(app.getHttpServer())
+        .patch(`/orders/${testOrderId}/authorize`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      const kitchenRes = await request(app.getHttpServer())
+        .get(`/kitchen/orders/${testOrderId}`)
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .expect(200);
+      const testKitchenOrderId = kitchenRes.body.id;
+
+      await request(app.getHttpServer())
+        .patch(`/kitchen/orders/${testKitchenOrderId}/status`)
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send({ status: 'PREPARING' })
+        .expect(403);
+
+      // Limpiar
+      await prisma.kitchenOrder.delete({ where: { id: testKitchenOrderId } });
+      await prisma.orderItem.deleteMany({ where: { orderId: testOrderId } });
+      await prisma.order.delete({ where: { id: testOrderId } });
+    });
+
+    it('WAITER no puede modificar estado de cocina (403)', async () => {
+      await request(app.getHttpServer())
+        .patch(`/kitchen/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${waiterToken}`)
+        .send({ status: 'PREPARING' })
+        .expect(403);
+    });
+  });
+
+  describe('GET /kitchen/orders', () => {
+    it('KITCHEN puede obtener órdenes de su restaurante', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/kitchen/orders')
+        .set('Authorization', `Bearer ${kitchenToken}`)
+        .expect(200);
+      expect(Array.isArray(res.body)).toBe(true);
+      expect(res.body.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it('SUPER_ADMIN puede obtener órdenes de cocina globalmente', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/kitchen/orders')
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .expect(200);
+      expect(Array.isArray(res.body)).toBe(true);
+    });
+
+    it('CASHIER no puede consultar órdenes de cocina (403)', async () => {
+      const cashierHash = await bcrypt.hash('TestPassword123', 10);
+      await prisma.user.create({
+        data: {
+          email: 'e2e-cashier-kitchen@test.com',
+          passwordHash: cashierHash,
+          name: 'E2E Cashier Kitchen',
+          role: UserRole.CASHIER,
+          restaurantId,
+          isActive: true,
+        },
+      });
+      const cashierLogin = await request(app.getHttpServer())
+        .post('/auth/login')
+        .send({ email: 'e2e-cashier-kitchen@test.com', password: 'TestPassword123' });
+      const cashierLoginToken = cashierLogin.body.accessToken;
+
+      await request(app.getHttpServer())
+        .get('/kitchen/orders')
+        .set('Authorization', `Bearer ${cashierLoginToken}`)
+        .expect(403);
+
+      await prisma.user.delete({ where: { email: 'e2e-cashier-kitchen@test.com' } });
+    });
+  });
+
+  describe('Aislamiento por restaurante', () => {
+    let otherRestaurantId: number;
+    let otherRestaurantTableId: number;
+    let otherRestaurantOrderId: number;
+    let otherRestaurantServiceId: number;
+    let otherProductId: number;
+
+    beforeAll(async () => {
+      // Crear segundo restaurante
+      const otherRes = await request(app.getHttpServer())
+        .post('/restaurants')
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .send({
+          name: 'E2E Other Restaurant Kitchen',
+          address: 'Otra Calle 123',
+          phone: '3009876543',
+          email: 'e2e-other-restaurant-kitchen@test.com',
+        })
+        .expect(201);
+      otherRestaurantId = otherRes.body.id;
+
+      // Crear mesa en otro restaurante
+      const otherTable = await prisma.table.create({
+        data: {
+          number: 78,
+          restaurantId: otherRestaurantId,
+          isActive: true,
+          isAvailable: true,
+          qrToken: 'e2e-other-kitchen-qr-token-001',
+        },
+      });
+      otherRestaurantTableId = otherTable.id;
+
+      // Crear producto en el otro restaurante
+      const otherProduct = await prisma.product.create({
+        data: {
+          name: 'E2E Other Product Kitchen',
+          description: 'Producto prueba otro restaurante',
+          price: 20000,
+          restaurantId: otherRestaurantId,
+        },
+      });
+      otherProductId = otherProduct.id;
+
+      // Crear pedido en otro restaurante
+      const otherRes2 = await request(app.getHttpServer())
+        .post('/orders/from-qr')
+        .send({
+          qrToken: 'e2e-other-kitchen-qr-token-001',
+          items: [{ productId: otherProduct.id, quantity: 1 }],
+        })
+        .expect(201);
+      otherRestaurantOrderId = otherRes2.body.id;
+      otherRestaurantServiceId = otherRes2.body.serviceId;
+
+      await request(app.getHttpServer())
+        .patch(`/orders/${otherRestaurantOrderId}/authorize`)
+        .set('Authorization', `Bearer ${superAdminToken}`)
+        .expect(200);
+    });
+
+    afterAll(async () => {
+      if (otherRestaurantOrderId) {
+        await prisma.kitchenOrder.delete({ where: { orderId: otherRestaurantOrderId } });
+        await prisma.orderItem.deleteMany({ where: { orderId: otherRestaurantOrderId } });
+        await prisma.order.delete({ where: { id: otherRestaurantOrderId } });
+      }
+      if (otherProductId) {
+        await prisma.product.delete({ where: { id: otherProductId } });
+      }
+      if (otherRestaurantServiceId) {
+        await prisma.service.delete({ where: { id: otherRestaurantServiceId } });
+      }
+      if (otherRestaurantTableId) {
+        await prisma.table.delete({ where: { id: otherRestaurantTableId } });
+      }
+      if (otherRestaurantId) {
+        await prisma.restaurant.delete({ where: { id: otherRestaurantId } });
+      }
+    });
+
+    it('KITCHEN no puede consultar orden de cocina de otro restaurante (404)', async () => {
+      await request(app.getHttpServer())
+        .get(`/kitchen/orders/${otherRestaurantOrderId}`)
+        .set('Authorization', `Bearer ${kitchenToken}`)
+        .expect(404);
+  });
+});
+});
 });

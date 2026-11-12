@@ -12,6 +12,7 @@ import { ServiceRequestModule } from './service-requests/service-request.module.
 import { OrdersModule } from './orders/orders.module.js';
 import { ServiceModule } from './service/service.module.js';
 import { MenuModule } from './menu/menu.module.js';
+import { KitchenModule } from './kitchen/kitchen.module.js';
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -31,6 +32,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     OrdersModule,
     ServiceModule,
     MenuModule,
+    KitchenModule,
   ],
 })
 export class AppModule { }
