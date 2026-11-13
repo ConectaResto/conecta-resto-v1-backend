@@ -11,6 +11,7 @@ import {
 } from '@nestjs/common';
 import { OrdersService } from './orders.service.js';
 import { CreateOrderFromQrDto } from './dto/create-order-from-qr.dto.js';
+import { CreateOrderFromWaiterDto } from './dto/create-order-from-waiter.dto.js';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../auth/guards/roles.guard.js';
 import { Roles } from '../auth/decorators/roles.decorator.js';
@@ -28,6 +29,21 @@ export class OrdersController {
     ) {
         return this.ordersService.createFromQr(
             createDto.qrToken,
+            createDto.items,
+        );
+    }
+
+    // Crear pedido desde panel del personal (autenticado, AUTHORIZED directo)
+    @Post()
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.WAITER)
+    createFromWaiter(
+        @Body() createDto: CreateOrderFromWaiterDto,
+        @Req() request: AuthenticatedRequest,
+    ) {
+        return this.ordersService.createFromWaiter(
+            request.user,
+            createDto.tableId,
             createDto.items,
         );
     }
