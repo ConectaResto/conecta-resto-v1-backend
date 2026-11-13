@@ -109,6 +109,120 @@ export class OrdersService {
         });
     }
 
+    async createFromWaiter(
+        user: AuthenticatedRequest['user'],
+        tableId: number,
+        items: OrderItemDto[],
+    ) {
+        return this.prisma.$transaction(async (prisma) => {
+            // 1. Bloquear la fila de la mesa con SELECT ... FOR UPDATE
+            const rows = await prisma.$queryRaw<
+                { id: number; restaurant_id: number; is_active: number }[]
+            >`
+                SELECT id, restaurant_id, is_active
+                FROM tables
+                WHERE id = ${tableId}
+                  AND is_active = 1
+                FOR UPDATE
+            `;
+
+            if (!rows || rows.length === 0) {
+                throw new NotFoundException('Mesa no encontrada o inactiva');
+            }
+
+            const table = rows[0];
+
+            // 2. Validar que el restaurante esté activo
+            const restaurant = await prisma.restaurant.findUnique({
+                where: { id: table.restaurant_id },
+            });
+
+            if (!restaurant || !restaurant.isActive) {
+                throw new ForbiddenException('El restaurante está inactivo');
+            }
+
+            // 3. Validar aislamiento por restaurante (excepto SUPER_ADMIN)
+            if (user.role !== UserRole.SUPER_ADMIN) {
+                if (table.restaurant_id !== user.restaurantId!) {
+                    throw new ForbiddenException(
+                        'No pertenece a su restaurante',
+                    );
+                }
+            }
+
+            // 4. Buscar o crear servicio ACTIVE para esta mesa
+            let service = await prisma.service.findFirst({
+                where: { tableId: table.id, status: 'ACTIVE' },
+            });
+
+            if (!service) {
+                service = await prisma.service.create({
+                    data: {
+                        tableId: table.id,
+                        restaurantId: table.restaurant_id,
+                        status: 'ACTIVE',
+                    },
+                });
+            }
+
+            // 5. Validar productos y congelar precios
+            const orderItemsData = [];
+            for (const item of items) {
+                const product = await prisma.product.findUnique({
+                    where: { id: item.productId },
+                });
+
+                if (!product) {
+                    throw new NotFoundException(
+                        `Producto con ID ${item.productId} no encontrado`,
+                    );
+                }
+
+                if (product.restaurantId !== table.restaurant_id) {
+                    throw new ForbiddenException(
+                        `El producto ${item.productId} no pertenece a este restaurante`,
+                    );
+                }
+
+                orderItemsData.push({
+                    productId: item.productId,
+                    quantity: item.quantity,
+                    price: product.price,
+                });
+            }
+
+            // 6. Crear la orden con estado AUTHORIZED
+            const order = await prisma.order.create({
+                data: {
+                    serviceId: service.id,
+                    restaurantId: table.restaurant_id,
+                    status: 'AUTHORIZED',
+                    authorizedAt: new Date(),
+                    orderItems: {
+                        create: orderItemsData,
+                    },
+                },
+                include: {
+                    orderItems: {
+                        include: {
+                            product: true,
+                        },
+                    },
+                },
+            });
+
+            // 7. Crear registro de cocina automáticamente
+            await prisma.kitchenOrder.create({
+                data: {
+                    orderId: order.id,
+                    status: KitchenOrderStatus.RECEIVED,
+                },
+            });
+
+            return order;
+        });
+    }
+
     async findPending(user: AuthenticatedRequest['user']) {
         return this.prisma.order.findMany({
             where:
