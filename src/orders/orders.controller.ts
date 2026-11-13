@@ -50,4 +50,12 @@ export class OrdersController {
     ) {
         return this.ordersService.authorize(id, request.user);
     }
+
+    // Listar pedidos listos para entregar (AUTHORIZED + KitchenOrder READY)
+    @Get('ready')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.WAITER)
+    findReady(@Req() request: AuthenticatedRequest) {
+        return this.ordersService.findReady(request.user);
+    }
 }
