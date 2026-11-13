@@ -160,6 +160,7 @@ model Service {
   restaurantId Int         @map("restaurant_id")
   status       ServiceStatus @default(ACTIVE) @map("status")
   createdAt    DateTime    @default(now()) @map("created_at")
+  closedAt     DateTime?   @map("closed_at")
 
   table   Table    @relation(fields: [tableId], references: [id])
   restaurant Restaurant @relation(fields: [restaurantId], references: [id])
