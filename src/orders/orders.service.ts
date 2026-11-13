@@ -136,6 +136,36 @@ export class OrdersService {
         });
     }
 
+    async findReady(user: AuthenticatedRequest['user']) {
+        return this.prisma.order.findMany({
+            where: {
+                status: OrderStatus.AUTHORIZED,
+                kitchenOrder: {
+                    status: KitchenOrderStatus.READY,
+                },
+                ...(user.role !== UserRole.SUPER_ADMIN && {
+                    restaurantId: user.restaurantId!,
+                }),
+            },
+            include: {
+                orderItems: {
+                    include: {
+                        product: true,
+                    },
+                },
+                service: {
+                    include: {
+                        table: true,
+                    },
+                },
+                kitchenOrder: true,
+            },
+            orderBy: {
+                createdAt: 'asc',
+            },
+        });
+    }
+
     async authorize(
         orderId: number,
         user: AuthenticatedRequest['user'],

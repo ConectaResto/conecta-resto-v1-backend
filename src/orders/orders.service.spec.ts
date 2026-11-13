@@ -295,6 +295,65 @@ describe('OrdersService', () => {
     });
   });
 
+  it('WAITER lista pedidos listos → solo AUTHORIZED y KitchenOrder READY, su restaurante', async () => {
+    vi.mocked(mockPrisma.order.findMany).mockResolvedValue([]);
+
+    await service.findReady(waiterUser);
+
+    expect(mockPrisma.order.findMany).toHaveBeenCalledWith({
+      where: {
+        status: 'AUTHORIZED',
+        kitchenOrder: { status: 'READY' },
+        restaurantId: 1,
+      },
+      include: {
+        orderItems: { include: { product: true } },
+        service: { include: { table: true } },
+        kitchenOrder: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  });
+
+  it('ADMIN lista pedidos listos → filtro restaurantId propio', async () => {
+    vi.mocked(mockPrisma.order.findMany).mockResolvedValue([]);
+
+    await service.findReady(adminUser);
+
+    expect(mockPrisma.order.findMany).toHaveBeenCalledWith({
+      where: {
+        status: 'AUTHORIZED',
+        kitchenOrder: { status: 'READY' },
+        restaurantId: 1,
+      },
+      include: {
+        orderItems: { include: { product: true } },
+        service: { include: { table: true } },
+        kitchenOrder: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  });
+
+  it('SUPER_ADMIN lista pedidos listos → sin filtro restaurantId', async () => {
+    vi.mocked(mockPrisma.order.findMany).mockResolvedValue([]);
+
+    await service.findReady(superAdminUser);
+
+    expect(mockPrisma.order.findMany).toHaveBeenCalledWith({
+      where: {
+        status: 'AUTHORIZED',
+        kitchenOrder: { status: 'READY' },
+      },
+      include: {
+        orderItems: { include: { product: true } },
+        service: { include: { table: true } },
+        kitchenOrder: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+  });
+
   it('WAITER autoriza pedido de su restaurante → AUTHORIZED con authorizedAt', async () => {
     const mockOrder = {
       id: 1,

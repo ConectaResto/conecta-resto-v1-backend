@@ -1210,6 +1210,8 @@ describe('Orders (e2e)', () => {
   let superAdminToken: string;
   let adminToken: string;
   let waiterToken: string;
+  let kitchenToken: string;
+  let kitchenUser: any;
   let orderId: number;
   let serviceId: number;
   let tableId: number;
@@ -1316,6 +1318,29 @@ describe('Orders (e2e)', () => {
       .send({ email: waiterUser.email, password: waiterUser.password });
     waiterToken = waiterLogin.body.accessToken;
 
+    // Crear y login KITCHEN
+    const kitchenUser = {
+      email: 'e2e-kitchen-ord@test.com',
+      password: 'TestPassword123',
+      name: 'E2E Kitchen Order',
+      role: UserRole.KITCHEN,
+    };
+    const kitchenHash = await bcrypt.hash(kitchenUser.password, 10);
+    await prisma.user.create({
+      data: {
+        email: kitchenUser.email,
+        passwordHash: kitchenHash,
+        name: kitchenUser.name,
+        role: kitchenUser.role,
+        restaurantId,
+        isActive: true,
+      },
+    });
+    const kitchenLogin = await request(app.getHttpServer())
+      .post('/auth/login')
+      .send({ email: kitchenUser.email, password: kitchenUser.password });
+    kitchenToken = kitchenLogin.body.accessToken;
+
     // Crear producto en este restaurante (vía Prisma, fixture de prueba)
     const product = await prisma.product.create({
       data: {
@@ -1334,7 +1359,7 @@ describe('Orders (e2e)', () => {
         restaurantId,
         isActive: true,
         isAvailable: true,
-        qrToken,
+        qrToken: 'e2e-orders-qr-token-001',
       },
     });
     tableId = table.id;
@@ -1353,6 +1378,7 @@ describe('Orders (e2e)', () => {
     await prisma.product.delete({ where: { id: productId } });
     await prisma.restaurant.delete({ where: { id: restaurantId } });
     await prisma.user.delete({ where: { email: waiterUser.email } });
+    await prisma.user.delete({ where: { email: kitchenUser.email } });
     await prisma.user.delete({ where: { email: adminUser.email } });
     await prisma.user.delete({ where: { email: superAdminUser.email } });
     await app.close();
@@ -1491,8 +1517,69 @@ describe('Orders (e2e)', () => {
       res.body.forEach((o: any) => {
         expect(o.restaurantId).toBe(restaurantId);
         expect(o.status).toBe('PENDING');
+      });
+    });
   });
-});
+
+  describe('GET /orders/ready', () => {
+    it('debe listar pedidos listos para entregar como WAITER con aislamiento por restaurante', async () => {
+      // Autorizar el pedido creado en from-qr
+      await request(app.getHttpServer())
+        .patch(`/orders/${orderId}/authorize`)
+        .set('Authorization', `Bearer ${adminToken}`)
+        .expect(200);
+
+      // Cocina marca el pedido como READY
+      await request(app.getHttpServer())
+        .patch(`/kitchen/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${kitchenToken}`)
+        .send({ status: 'PREPARING' })
+        .expect(200);
+      await request(app.getHttpServer())
+        .patch(`/kitchen/orders/${orderId}/status`)
+        .set('Authorization', `Bearer ${kitchenToken}`)
+        .send({ status: 'READY' })
+        .expect(200);
+
+      const res = await request(app.getHttpServer())
+        .get('/orders/ready')
+        .set('Authorization', `Bearer ${waiterToken}`)
+        .expect(200);
+
+      expect(Array.isArray(res.body)).toBe(true);
+      const readyOrder = res.body.find((o: any) => o.id === orderId);
+      expect(readyOrder).toBeDefined();
+      expect(readyOrder.status).toBe('AUTHORIZED');
+      expect(readyOrder.kitchenOrder.status).toBe('READY');
+      expect(Array.isArray(readyOrder.orderItems)).toBe(true);
+      expect(readyOrder.service.table.number).toBe(88);
+    });
+
+    it('no debe devolver pedidos PENDING ni cuya cocina no esté READY', async () => {
+      // Crear un segundo pedido PENDING (no autorizado)
+      const resPending = await request(app.getHttpServer())
+        .post('/orders/from-qr')
+        .send({
+          qrToken,
+          items: [{ productId, quantity: 1 }],
+        })
+        .expect(201);
+      const pendingOrderId = resPending.body.id;
+
+      const res = await request(app.getHttpServer())
+        .get('/orders/ready')
+        .set('Authorization', `Bearer ${waiterToken}`)
+        .expect(200);
+
+      const pendingOrder = res.body.find((o: any) => o.id === pendingOrderId);
+      expect(pendingOrder).toBeUndefined();
+
+      // Limpiar
+      await prisma.kitchenOrder.delete({ where: { orderId: pendingOrderId } });
+      await prisma.orderItem.deleteMany({ where: { orderId: pendingOrderId } });
+      await prisma.order.delete({ where: { id: pendingOrderId } });
+    });
+  });
 });
 
 describe('Kitchen (e2e)', () => {
@@ -1952,6 +2039,5 @@ describe('Kitchen (e2e)', () => {
         .set('Authorization', `Bearer ${kitchenToken}`)
         .expect(404);
   });
-});
 });
 });
