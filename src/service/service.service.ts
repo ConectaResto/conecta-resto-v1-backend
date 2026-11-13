@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service.js';
 import { AuthenticatedRequest } from '../auth/interfaces/authenticated-request.interface.js';
 import { UserRole } from '../../generated/prisma/enums.js';
+import { OrderStatus } from '../../generated/prisma/enums.js';
 
 @Injectable()
 export class ServiceService {
@@ -149,5 +150,77 @@ export class ServiceService {
         }
 
         return service;
+    }
+
+    async close(
+        serviceId: number,
+        user: AuthenticatedRequest['user'],
+    ) {
+        return this.prisma.$transaction(async (prisma) => {
+            // 1. Bloquear la fila del servicio con SELECT ... FOR UPDATE
+            const service = await prisma.service.findFirst({
+                where: { id: serviceId },
+            });
+
+            if (!service) {
+                throw new NotFoundException('Servicio no encontrado');
+            }
+
+            // 2. Bloquear la fila de la tabla asociada para serializar con createFromQr/createFromWaiter
+            const tableRows = await prisma.$queryRaw<
+                { id: number; restaurant_id: number; is_active: number }[]
+            >`
+                SELECT id, restaurant_id, is_active
+                FROM tables
+                WHERE id = ${service.tableId}
+                  AND is_active = 1
+                FOR UPDATE
+            `;
+
+            if (!tableRows || tableRows.length === 0) {
+                throw new NotFoundException('Mesa no encontrada o inactiva');
+            }
+
+            const table = tableRows[0];
+
+            // 3. Validar que el servicio siga siendo ACTIVE (pudo cerrarse mientras esperábamos el bloqueo de la tabla)
+            const currentService = await prisma.service.findUnique({
+                where: { id: serviceId },
+            });
+
+            if (!currentService || currentService.status !== 'ACTIVE') {
+                throw new NotFoundException('Servicio no encontrado o ya cerrado');
+            }
+
+            // 4. Validar aislamiento por restaurante (excepto SUPER_ADMIN)
+            if (user.role !== UserRole.SUPER_ADMIN) {
+                if (table.restaurant_id !== user.restaurantId!) {
+                    throw new ForbiddenException('No pertenece a su restaurante');
+                }
+            }
+
+            // 5. Verificar que no existan órdenes PENDING asociadas
+            const pendingOrders = await prisma.order.count({
+                where: {
+                    serviceId: serviceId,
+                    status: OrderStatus.PENDING,
+                },
+            });
+
+            if (pendingOrders > 0) {
+                throw new ForbiddenException(
+                    'No se puede cerrar el servicio: tiene órdenes pendientes sin autorizar',
+                );
+            }
+
+            // 6. Cerrar el servicio
+            return await prisma.service.update({
+                where: { id: serviceId },
+                data: {
+                    status: 'INACTIVE',
+                    closedAt: new Date(),
+                },
+            });
+        });
     }
 }

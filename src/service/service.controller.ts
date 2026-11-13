@@ -4,6 +4,7 @@ import {
     Get,
     Param,
     ParseIntPipe,
+    Patch,
     Post,
     Req,
     UseGuards,
@@ -48,5 +49,16 @@ export class ServiceController {
         @Req() request: AuthenticatedRequest,
     ) {
         return this.serviceService.findOne(id, request.user);
+    }
+
+    // Cerrar servicio de mesa
+    @Patch(':id/close')
+    @UseGuards(JwtAuthGuard, RolesGuard)
+    @Roles(UserRole.SUPER_ADMIN, UserRole.ADMIN, UserRole.WAITER)
+    close(
+        @Param('id', ParseIntPipe) id: number,
+        @Req() request: AuthenticatedRequest,
+    ) {
+        return this.serviceService.close(id, request.user);
     }
 }
